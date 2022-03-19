@@ -12,7 +12,7 @@ from selenium.common.exceptions import NoSuchElementException
 
 
 URL_BBC_LOGIN = 'https://account.bbc.com/signin'
-URL_BBC_MY_SOUNDS = 'https://www.bbc.co.uk/sounds/my'
+URL_BBC_MY_SOUNDS = 'https://www.bbc.co.uk/sounds/my?page={}'
 
 
 def bbc_login(driver, bbc_username, bbc_password):
@@ -34,29 +34,26 @@ def get_episode_id(url):
 def get_episodes(driver):
     """Get the URLs for episodes of shows I'm subscribed to"""
     episode_urls = []
-
-    driver.get(URL_BBC_MY_SOUNDS)
-
-    # Click on the accept cookies prompt if it is displayed
-    accept_cookies = driver.find_elements(By.CSS_SELECTOR, '#bbccookies-continue-button')
-    
-    if accept_cookies:
-        accept_cookies[0].click()
-
     page = 1
 
     while True:
+        driver.get(URL_BBC_MY_SOUNDS.format(page))
+
+        # Click on the accept cookies prompt if it is displayed
+        accept_cookies = driver.find_elements(By.CSS_SELECTOR, '#bbccookies-continue-button')
+    
+        if accept_cookies:
+            accept_cookies[0].click()
+
         locations = driver.find_elements(By.CSS_SELECTOR, 'div.sounds-react-app li a[href*="/play/"]')
         page_episode_urls = [anchor.get_attribute('href') for anchor in locations]
-        print(f'Found {len(page_episode_urls)} episodes on page {page}')
-        episode_urls += page_episode_urls
-        next_button = driver.find_elements(By.CSS_SELECTOR, 'a.sc-c-pagination-button__paddle .sc-c-icon--chevron-right')
 
-        if not next_button:
+        episode_count = len(page_episode_urls)
+        if episode_count == 0:
             break
 
-        next_button[0].click()
-        time.sleep(5)
+        print(f'Found {episode_count} episodes on page {page}')
+        episode_urls += page_episode_urls
         page += 1
 
     return episode_urls
@@ -107,7 +104,7 @@ def fetch_episode_metadata(driver, url):
     }
 
 
-def fetch_new_episodes(foreground, bbc_username, bbc_password, output_dir):
+def fetch_episodes(foreground, bbc_username, bbc_password, output_dir):
     """Use Selenium to get episodes of the shows subscribed to"""
 
     chrome_options = Options()
@@ -139,16 +136,22 @@ def download_episodes(episodes, output_dir):
     for episode in episodes:
         filename = f'{output_dir}/{episode["id"]}/audio.m4a'
 
+        if Path(filename).exists():
+            print(f'{filename} exists')
+            continue
+
         ydl_options = {
             'outtmpl': filename,
             'format': 'm4a'
         }
         
         with youtube_dl.YoutubeDL(ydl_options) as ydl:
-            # This automatically skips if file is already downloaded
-            result = ydl.download([episode['url']])
-
-
+            
+            try:
+                # This automatically skips if file is already downloaded
+                ydl.download([episode['url']])
+            except Exception as e:
+                print(repr(e))
 
 
 def main():
@@ -167,8 +170,8 @@ def main():
     if not bbc_username or not bbc_password:
         raise ValueError('Missing BBC credentials')
 
-    episodes = fetch_new_episodes(foreground, bbc_username, bbc_password, output_dir)
-    # download_episodes(episodes, output_dir)    
+    episodes = fetch_episodes(foreground, bbc_username, bbc_password, output_dir)
+    download_episodes(episodes, output_dir)    
 
 if __name__ == '__main__':
     main()
