@@ -1,4 +1,5 @@
 import argparse
+import atexit
 import os
 import youtube_dl
 import json
@@ -15,7 +16,103 @@ URL_BBC_LOGIN = 'https://account.bbc.com/signin'
 URL_BBC_MY_SOUNDS = 'https://www.bbc.co.uk/sounds/my?page={}'
 
 
-def bbc_login(driver, bbc_username, bbc_password):
+class Episode:
+    def __init__(self, url):
+        self.url = url
+        self.id = url.split('/')[-1]
+        self.data_directory = f'{output_dir}/{self.id}'
+        self.audio_filename = f'{self.data_directory}/audio.m4a'
+        self.metadata_filename = f'{self.data_directory}/episode.json'
+
+
+    def is_downloaded(self):
+        """Returns true if the audio is downloaded for this episode"""
+
+        return Path(self.audio_filename).exists()
+
+
+    def _read_metadata_file(self):
+        with open(self.metadata_filename, 'r') as metadata:
+            episode_metadata = json.loads(metadata.read())
+
+        if episode_metadata['id'] != self.id:
+            raise ValueError()
+
+        self.title = episode_metadata['title']
+        self.description = episode_metadata['description']
+
+
+    def _write_metadata_file(self):
+        episode_metadata = {
+            'id': self.id,
+            'url': self.url,
+            'title': self.title,
+            'description': self.description
+        }
+
+        Path(self.data_directory).mkdir(parents=True, exist_ok=True)
+        with open(self.metadata_filename, 'w') as metadata:
+            metadata.write(json.dumps(episode_metadata))
+
+
+    def load_metadata(self):
+        """Get metadata from local cache or from website"""
+
+        global output_dir
+
+        try:
+            self._read_metadata_file()
+            print(f'Read metadata for {self.id} from file {self.metadata_filename}')
+        except:
+            self._fetch_metadata()
+            self._write_metadata_file()
+            print(f'Read metadata for {self.id} from website')
+
+
+    def _fetch_metadata(self):
+        """Get information about an episode from the BBC Sounds website"""
+        
+        global driver
+
+        driver.get(self.url)
+
+        try:
+            show_more = driver.find_element(By.CLASS_NAME, 'sc-c-synopsis__button')
+            show_more.click()
+        except NoSuchElementException:
+            pass
+
+        heading = driver.find_element(By.CSS_SELECTOR, '.sc-c-herospace__details-titles .sc-u-screenreader-only')
+        synopsis = driver.find_element(By.CLASS_NAME, 'sc-c-synopsis')
+        
+        self.title = heading.text
+        self.description = synopsis.text
+
+
+def initialise_selenium(foreground):
+    """Initialise the Selenium driver"""
+    global driver
+
+    chrome_options = Options()
+
+    if foreground:
+        chrome_options.add_experimental_option('detach', True)
+    else:
+        chrome_options.add_argument('--headless')
+
+    chromedriver_path = os.path.join((os.path.dirname(os.path.realpath(__file__))), 'chromedriver')
+    service = Service(chromedriver_path)
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    driver.set_window_size(1024, 1280)
+
+
+def clean_up_selenium():
+    global driver
+
+    driver.close()
+
+
+def bbc_login(bbc_username, bbc_password):
     """Login in to the BBC site"""
 
     driver.get(URL_BBC_LOGIN)
@@ -27,12 +124,11 @@ def bbc_login(driver, bbc_username, bbc_password):
     submit_button.click()
 
 
-def get_episode_id(url):
-    return url.split('/')[-1]
+def get_episodes():
+    """Get the episodes of shows subscribed to on BBC Sounds"""
 
+    global driver 
 
-def get_episodes(driver):
-    """Get the URLs for episodes of shows I'm subscribed to"""
     episode_urls = []
     page = 1
 
@@ -47,8 +143,8 @@ def get_episodes(driver):
 
         locations = driver.find_elements(By.CSS_SELECTOR, 'div.sounds-react-app li a[href*="/play/"]')
         page_episode_urls = [anchor.get_attribute('href') for anchor in locations]
-
         episode_count = len(page_episode_urls)
+        
         if episode_count == 0:
             break
 
@@ -56,92 +152,24 @@ def get_episodes(driver):
         episode_urls += page_episode_urls
         page += 1
 
-    return episode_urls
+    episodes  = [Episode(url) for url in episode_urls]
 
-
-def get_episode_metadata(driver, url, output_dir):
-    """Get metadata from local cache or from website"""
-
-    episode_id = get_episode_id(url)
-    metadata_directory = f'{output_dir}/{episode_id}'
-    metadata_filename = f'{metadata_directory}/episode.json'
-
-    try:
-        with open(metadata_filename, 'r') as metadata:
-            episode_metadata = json.loads(metadata.read())
-            print(f'Read metadata for {episode_id} from file {metadata_filename}')
-    except Exception as e:
-        episode_metadata = fetch_episode_metadata(driver, url)
-        Path(metadata_directory).mkdir(parents=True, exist_ok=True)
-        with open(metadata_filename, 'w') as metadata:
-            metadata.write(json.dumps(episode_metadata))
-        print(f'Read metadata for {episode_id} from website')
-
-    return episode_metadata
-
-
-def fetch_episode_metadata(driver, url):
-    """Get information about an episode from the BBC Sounds website"""
-    
-    driver.get(url)
-
-    try:
-        show_more = driver.find_element(By.CLASS_NAME, 'sc-c-synopsis__button')
-        show_more.click()
-    except NoSuchElementException:
-        pass
-
-    heading = driver.find_element(By.CSS_SELECTOR, '.sc-c-herospace__details-titles .sc-u-screenreader-only')
-    title = heading.text
-    synopsis = driver.find_element(By.CLASS_NAME, 'sc-c-synopsis')
-    description = synopsis.text
-    
-    return {
-        'id': get_episode_id(url),
-        'url': url,
-        'title': title,
-        'description': description
-    }
-
-
-def fetch_episodes(foreground, bbc_username, bbc_password, output_dir):
-    """Use Selenium to get episodes of the shows subscribed to"""
-
-    chrome_options = Options()
-
-    if foreground:
-        chrome_options.add_experimental_option('detach', True)
-    else:
-        chrome_options.add_argument('--headless')
-
-    chromedriver_path = os.path.join((os.path.dirname(os.path.realpath(__file__))), 'chromedriver')
-    service = Service(chromedriver_path)
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    driver.set_window_size(1024, 1280)
-
-    bbc_login(driver, bbc_username, bbc_password)
-    episode_urls = get_episodes(driver)
-    
-    episodes = [get_episode_metadata(driver, url, output_dir) for url in episode_urls]
-
-    if not foreground:
-        driver.close()
+    for episode in episodes:
+        episode.load_metadata()
 
     return episodes
 
 
-def download_episodes(episodes, output_dir):
+def download_episodes(episodes):
     """Download audio files for each episode"""
 
     for episode in episodes:
-        filename = f'{output_dir}/{episode["id"]}/audio.m4a'
-
-        if Path(filename).exists():
-            print(f'{filename} exists')
+        if episode.is_downloaded():
+            print(f'Episode {episode.id} already downloaded')
             continue
 
         ydl_options = {
-            'outtmpl': filename,
+            'outtmpl': episode.audio_filename,
             'format': 'm4a'
         }
         
@@ -149,29 +177,35 @@ def download_episodes(episodes, output_dir):
             
             try:
                 # This automatically skips if file is already downloaded
-                ydl.download([episode['url']])
+                ydl.download([episode.url])
             except Exception as e:
                 print(repr(e))
 
 
 def main():
+    global output_dir
+
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
-    parser.add_argument('-u', '--bbc-username', help='BBC account username or email')
-    parser.add_argument('-p', '--bbc-password', help='BBC account password')
+    parser.add_argument('-u', '--bbc-username', help='BBC account username or email', required=True)
+    parser.add_argument('-p', '--bbc-password', help='BBC account password', required=True)
     parser.add_argument('-b', '--show-browser', action='store_true', help='Show automation browser in the foreground')
-    parser.add_argument('-o', '--output-dir', help='Output Directory')
+    parser.add_argument('-o', '--output-dir', help='Output Directory', required=True)
     args = parser.parse_args()
 
     bbc_username = args.bbc_username
     bbc_password = args.bbc_password
     foreground = args.show_browser
     output_dir = args.output_dir
+    
+    initialise_selenium(foreground)
+    bbc_login(bbc_username, bbc_password)
+    episodes = get_episodes()
 
-    if not bbc_username or not bbc_password:
-        raise ValueError('Missing BBC credentials')
+    if not foreground:
+        clean_up_selenium()
 
-    episodes = fetch_episodes(foreground, bbc_username, bbc_password, output_dir)
-    download_episodes(episodes, output_dir)    
+    download_episodes(episodes)
+
 
 if __name__ == '__main__':
     main()
