@@ -3,8 +3,13 @@ import atexit
 import os
 import youtube_dl
 import json
+import shutil
 import time
+import pytz
 from pathlib import Path
+from datetime import datetime
+from feedgen.feed import FeedGenerator
+from mutagen.mp4 import MP4
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -13,13 +18,18 @@ from selenium.common.exceptions import NoSuchElementException
 
 
 URL_BBC_LOGIN = 'https://account.bbc.com/signin'
+URL_BBC_SOUNDS = 'https://www.bbc.co.uk/sounds'
 URL_BBC_MY_SOUNDS = 'https://www.bbc.co.uk/sounds/my?page={}'
 
 
 class Episode:
-    def __init__(self, url):
-        self.url = url
-        self.id = url.split('/')[-1]
+    def __init__(self, url=None, id=None):
+        if id:
+            self.id = id
+        else:
+            self.url = url
+            self.id = url.split('/')[-1]
+        
         self.data_directory = f'{output_dir}/{self.id}'
         self.audio_filename = f'{self.data_directory}/audio.m4a'
         self.metadata_filename = f'{self.data_directory}/episode.json'
@@ -38,6 +48,7 @@ class Episode:
         if episode_metadata['id'] != self.id:
             raise ValueError()
 
+        self.url = episode_metadata['url']
         self.title = episode_metadata['title']
         self.description = episode_metadata['description']
 
@@ -144,7 +155,7 @@ def get_episodes():
         locations = driver.find_elements(By.CSS_SELECTOR, 'div.sounds-react-app li a[href*="/play/"]')
         page_episode_urls = [anchor.get_attribute('href') for anchor in locations]
         episode_count = len(page_episode_urls)
-        
+
         if episode_count == 0:
             break
 
@@ -181,6 +192,74 @@ def download_episodes(episodes):
             except Exception as e:
                 print(repr(e))
 
+def load_episodes():
+    """Create episodes from local data rather than the BBC Sounds website"""
+
+    episodes = []
+
+    for dir, _, files in os.walk(output_dir):
+        if 'episode.json' in files:
+            episode_id = Path(dir).relative_to(output_dir).name
+            episode = Episode(id=episode_id)
+            episode.load_metadata()
+            episodes.append(episode)
+
+    return episodes
+
+
+def create_rss_feed(episodes, podcast_path):
+    global output_dir
+
+    shutil.copy2('logo.png', output_dir)
+    logo_url = f'{podcast_path}/logo.png'
+
+    episodes = (episode for episode in episodes if episode.is_downloaded())
+
+    fg = FeedGenerator()
+    fg.load_extension('podcast')
+
+    fg.title('BBC Sounds Subscriptions')
+    fg.description('Episodes of shows I have subscribed to on BBC Sounds')
+    fg.author({'name': 'BBC Sounds', 'email': 'sounds@bbc.co.uk'})
+    #fg.logo(f'{podcast_path}/logo.png')
+    fg.link(href=f'{podcast_path}/podcast.xml', rel='self')
+    fg.language('en')
+
+    fg.podcast.itunes_category('Arts')
+    fg.podcast.itunes_category('Comedy')
+    fg.podcast.itunes_category('Music')
+    fg.podcast.itunes_category('News')
+    fg.podcast.itunes_category('Sports')
+    fg.podcast.itunes_author('BBC Sounds')
+    fg.podcast.itunes_block(True)
+    fg.podcast.itunes_explicit('no')
+    fg.podcast.itunes_image(logo_url)
+    fg.podcast.itunes_owner(name='BBC Sounds', email='sounds@bbc.co.uk')
+
+    for episode in episodes:
+        size_in_bytes = os.path.getsize(episode.audio_filename)
+        mtime = os.path.getmtime(episode.audio_filename)
+        published = datetime.fromtimestamp(mtime, pytz.utc)
+        audio = MP4(episode.audio_filename)
+        duration_in_seconds = int(audio.info.length)
+        url = f'{podcast_path}/{episode.audio_filename}'
+
+        fe = fg.add_entry()
+        fe.id(url)
+        fe.title(episode.title)
+        fe.description(episode.description)
+        fe.enclosure(url=url, length=str(size_in_bytes), type='audio/mpeg')
+        fe.published(published)
+        fe.podcast.itunes_duration(duration_in_seconds)
+
+    fg.rss_str(pretty=True)
+    fg.rss_file(f'{output_dir}/podcast.xml')
+
+
+# def copy_to_s3(episodes):
+#     import boto
+#     s3 = boto.connect_s3()
+
 
 def main():
     global output_dir
@@ -190,21 +269,31 @@ def main():
     parser.add_argument('-p', '--bbc-password', help='BBC account password', required=True)
     parser.add_argument('-b', '--show-browser', action='store_true', help='Show automation browser in the foreground')
     parser.add_argument('-o', '--output-dir', help='Output Directory', required=True)
+    parser.add_argument('-x', '--podcast-path', help='Podcast Path Prefix', required=True)
+    parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using cached data', required=True)
     args = parser.parse_args()
 
     bbc_username = args.bbc_username
     bbc_password = args.bbc_password
     foreground = args.show_browser
     output_dir = args.output_dir
-    
-    initialise_selenium(foreground)
-    bbc_login(bbc_username, bbc_password)
-    episodes = get_episodes()
+    podcast_path = args.podcast_path
+    cache = args.cache
 
-    if not foreground:
-        clean_up_selenium()
+    if cache:
+        episodes = load_episodes()
+    else:
+        initialise_selenium(foreground)
+        bbc_login(bbc_username, bbc_password)
+        episodes = get_episodes()
 
-    download_episodes(episodes)
+        if not foreground:
+            clean_up_selenium()
+
+        download_episodes(episodes)
+
+    create_rss_feed(episodes, podcast_path)
+    # copy_to_s3(episodes)
 
 
 if __name__ == '__main__':
