@@ -6,6 +6,7 @@ import json
 import shutil
 import time
 import pytz
+import requests
 from pathlib import Path
 from datetime import datetime
 from feedgen.feed import FeedGenerator
@@ -33,12 +34,25 @@ class Episode:
         self.data_directory = f'{output_dir}/{self.id}'
         self.audio_filename = f'{self.data_directory}/audio.m4a'
         self.metadata_filename = f'{self.data_directory}/episode.json'
+        self.image_filename = f'{self.data_directory}/image.jpg'
 
 
-    def is_downloaded(self):
+    def is_audio_downloaded(self):
         """Returns true if the audio is downloaded for this episode"""
 
         return Path(self.audio_filename).exists()
+
+
+    def is_image_downloaded(self):
+        """Returns true if the audio is downloaded for this episode"""
+
+        return Path(self.image_filename).exists()
+
+    
+    def is_downloaded(self):
+        """Returns true if the audio and image is downloaded for this episode"""
+
+        return self.is_audio_downloaded() and self.is_image_downloaded()
 
 
     def _read_metadata_file(self):
@@ -51,6 +65,7 @@ class Episode:
         self.url = episode_metadata['url']
         self.title = episode_metadata['title']
         self.description = episode_metadata['description']
+        self.image_url = episode_metadata['image_url']
 
 
     def _write_metadata_file(self):
@@ -58,7 +73,8 @@ class Episode:
             'id': self.id,
             'url': self.url,
             'title': self.title,
-            'description': self.description
+            'description': self.description,
+            'image_url': self.image_url
         }
 
         Path(self.data_directory).mkdir(parents=True, exist_ok=True)
@@ -95,9 +111,16 @@ class Episode:
 
         heading = driver.find_element(By.CSS_SELECTOR, '.sc-c-herospace__details-titles .sc-u-screenreader-only')
         synopsis = driver.find_element(By.CLASS_NAME, 'sc-c-synopsis')
+        image = driver.find_element(By.CLASS_NAME, 'sc-c-herospace__image')
         
-        self.title = heading.text
+        title = heading.text
+        
+        if title.endswith(' - BBC Sounds'):
+            title = title[:-13]
+
+        self.title = title
         self.description = synopsis.text
+        self.image_url = image.get_attribute('src')
 
 
 def initialise_selenium(foreground):
@@ -135,15 +158,16 @@ def bbc_login(bbc_username, bbc_password):
     submit_button.click()
 
 
-def get_episodes():
+def get_episodes(max_episodes):
     """Get the episodes of shows subscribed to on BBC Sounds"""
 
     global driver 
 
     episode_urls = []
-    page = 1
+    page = 0
 
     while True:
+        page += 1
         driver.get(URL_BBC_MY_SOUNDS.format(page))
 
         # Click on the accept cookies prompt if it is displayed
@@ -161,7 +185,11 @@ def get_episodes():
 
         print(f'Found {episode_count} episodes on page {page}')
         episode_urls += page_episode_urls
-        page += 1
+
+        if len(episode_urls) >= max_episodes:
+            episode_urls = episode_urls[:max_episodes]
+            break
+
 
     episodes  = [Episode(url) for url in episode_urls]
 
@@ -172,18 +200,37 @@ def get_episodes():
 
 
 def download_episodes(episodes):
-    """Download audio files for each episode"""
+    """Download the assets for all episodes"""
 
     for episode in episodes:
-        if episode.is_downloaded():
-            print(f'Episode {episode.id} already downloaded')
-            continue
+        download_episode_audio(episode)
+        download_episode_image(episode)
 
+
+def download_episode_image(episode):
+    """Download the image files for each episode"""
+
+    if episode.is_image_downloaded():
+        print(f'Image for episode {episode.id} already downloaded')
+    else:
+        response = requests.get(episode.image_url, stream=True)
+        with open(episode.image_filename, 'wb') as out_file:
+            shutil.copyfileobj(response.raw, out_file)
+
+        print(f'Image for episode {episode.id} downloaded from website')
+
+
+def download_episode_audio(episode):
+    """Download audio files for each episode"""
+
+    if episode.is_audio_downloaded():
+        print(f'Audio for episode {episode.id} already downloaded')
+    else:
         ydl_options = {
             'outtmpl': episode.audio_filename,
             'format': 'm4a'
         }
-        
+
         with youtube_dl.YoutubeDL(ydl_options) as ydl:
             
             try:
@@ -191,6 +238,7 @@ def download_episodes(episodes):
                 ydl.download([episode.url])
             except Exception as e:
                 print(repr(e))
+
 
 def load_episodes():
     """Create episodes from local data rather than the BBC Sounds website"""
@@ -221,7 +269,7 @@ def create_rss_feed(episodes, podcast_path):
     fg.title('BBC Sounds Subscriptions')
     fg.description('Episodes of shows I have subscribed to on BBC Sounds')
     fg.author({'name': 'BBC Sounds', 'email': 'sounds@bbc.co.uk'})
-    #fg.logo(f'{podcast_path}/logo.png')
+    fg.logo(f'{podcast_path}/logo.png')
     fg.link(href=f'{podcast_path}/podcast.xml', rel='self')
     fg.language('en')
 
@@ -242,15 +290,17 @@ def create_rss_feed(episodes, podcast_path):
         published = datetime.fromtimestamp(mtime, pytz.utc)
         audio = MP4(episode.audio_filename)
         duration_in_seconds = int(audio.info.length)
-        url = f'{podcast_path}/{episode.audio_filename}'
+        audio_url = f'{podcast_path}/{episode.audio_filename}'
+        image_url = f'{podcast_path}/{episode.image_filename}'
 
         fe = fg.add_entry()
-        fe.id(url)
+        fe.id(audio_url)
         fe.title(episode.title)
         fe.description(episode.description)
-        fe.enclosure(url=url, length=str(size_in_bytes), type='audio/mpeg')
+        fe.enclosure(url=audio_url, length=str(size_in_bytes), type='audio/mpeg')
         fe.published(published)
         fe.podcast.itunes_duration(duration_in_seconds)
+        fe.podcast.itunes_image(image_url)
 
     fg.rss_str(pretty=True)
     fg.rss_file(f'{output_dir}/podcast.xml')
@@ -265,12 +315,13 @@ def main():
     global output_dir
 
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
-    parser.add_argument('-u', '--bbc-username', help='BBC account username or email', required=True)
-    parser.add_argument('-p', '--bbc-password', help='BBC account password', required=True)
+    parser.add_argument('-u', '--bbc-username', required=True, help='BBC account username or email')
+    parser.add_argument('-p', '--bbc-password', required=True, help='BBC account password')
     parser.add_argument('-b', '--show-browser', action='store_true', help='Show automation browser in the foreground')
-    parser.add_argument('-o', '--output-dir', help='Output Directory', required=True)
-    parser.add_argument('-x', '--podcast-path', help='Podcast Path Prefix', required=True)
-    parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using cached data', required=True)
+    parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
+    parser.add_argument('-x', '--podcast-path', required=True, help='Podcast Path Prefix')
+    parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using cached data')
+    parser.add_argument('-m', '--max_episodes', type=int, help='Maximum number of episodes')
     args = parser.parse_args()
 
     bbc_username = args.bbc_username
@@ -279,13 +330,14 @@ def main():
     output_dir = args.output_dir
     podcast_path = args.podcast_path
     cache = args.cache
+    max_episodes = args.max_episodes
 
     if cache:
         episodes = load_episodes()
     else:
         initialise_selenium(foreground)
         bbc_login(bbc_username, bbc_password)
-        episodes = get_episodes()
+        episodes = get_episodes(max_episodes)
 
         if not foreground:
             clean_up_selenium()
