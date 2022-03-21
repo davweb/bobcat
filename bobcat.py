@@ -7,6 +7,7 @@ import json
 import shutil
 from pathlib import Path
 from datetime import datetime
+import boto3
 import pytz
 import requests
 import youtube_dl
@@ -22,6 +23,9 @@ from selenium.common.exceptions import NoSuchElementException
 URL_BBC_LOGIN = 'https://account.bbc.com/signin'
 URL_BBC_SOUNDS = 'https://www.bbc.co.uk/sounds'
 URL_BBC_MY_SOUNDS = 'https://www.bbc.co.uk/sounds/my?page={}'
+
+RSS_FILE = 'podcast.xml'
+LOGO_FILE = 'logo.png'
 
 DRIVER = None
 
@@ -268,7 +272,7 @@ def load_episodes():
 
 def create_rss_feed(episodes, podcast_path):
     """Create the RSS file for the episodes"""
-    logo_url = f'{podcast_path}/logo.png'
+    logo_url = f'{podcast_path}/{LOGO_FILE}'
 
     episodes = (episode for episode in episodes if episode.is_downloaded())
 
@@ -279,7 +283,7 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.description('Episodes of shows I have subscribed to on BBC Sounds')
     feed_generator.author({'name': 'BBC Sounds', 'email': 'sounds@bbc.co.uk'})
     feed_generator.logo(logo_url)
-    feed_generator.link(href=f'{podcast_path}/podcast.xml', rel='self')
+    feed_generator.link(href=f'{podcast_path}/{RSS_FILE}', rel='self')
     feed_generator.language('en')
 
     feed_generator.podcast.itunes_category('Arts')
@@ -312,12 +316,38 @@ def create_rss_feed(episodes, podcast_path):
         feed_entry.podcast.itunes_image(image_url)
 
     feed_generator.rss_str(pretty=True)
-    feed_generator.rss_file('podcast.xml')
+    feed_generator.rss_file(RSS_FILE)
 
 
-# def copy_to_s3(episodes):
-#     import boto
-#     s3 = boto.connect_s3()
+def sync_with_s3(episodes, aws_access_id, aws_secret_key, aws_bucket_name):
+    s3 = boto3.resource('s3', aws_access_key_id=aws_access_id, aws_secret_access_key=aws_secret_key)
+    bucket = s3.Bucket(aws_bucket_name)
+    uploaded = set(object.key for object in bucket.objects.all())
+    
+    in_feed = set([RSS_FILE, LOGO_FILE])
+
+    for episode in episodes:
+        in_feed.add(episode.audio_filename)
+        in_feed.add(episode.image_filename)
+    
+    to_upload = in_feed - uploaded
+    to_delete = uploaded - in_feed
+
+    # Always upload the latest RSS file
+    to_upload.add(RSS_FILE)
+
+    print(f'Uploading {len(to_upload)} files to S3 Bucket {aws_bucket_name}')
+
+    for file in to_upload:
+        bucket.upload_file(file, file)
+        object = s3.Bucket(aws_bucket_name).Object(file)
+        object.Acl().put(ACL='public-read')
+        print (f'Uploaded {file} to S3 Bucket {aws_bucket_name}')
+
+    if to_delete:
+        objects_to_delete = [{'Key': file} for file in to_delete]
+        bucket.delete_objects(Delete={'Objects': objects_to_delete})
+        print (f'Removed {",".join(to_delete)} from S3 Bucket {aws_bucket_name}')
 
 
 def main():
@@ -328,11 +358,14 @@ def main():
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
     parser.add_argument('-u', '--bbc-username', required=True, help='BBC account username or email')
     parser.add_argument('-p', '--bbc-password', required=True, help='BBC account password')
-    parser.add_argument('-b', '--show-browser', action='store_true', help='Show automation browser in the foreground')
+    parser.add_argument('-s', '--show-browser', action='store_true', help='Show automation browser in the foreground')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
     parser.add_argument('-x', '--podcast-path', required=True, help='Podcast Path Prefix')
     parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using cached data')
     parser.add_argument('-m', '--max_episodes', type=int, help='Maximum number of episodes')
+    parser.add_argument('-a', '--aws-access-id', required=True, help='AWS Access Key ID')
+    parser.add_argument('-k', '--aws-secret-key', required=True, help='AWS Secret Key')
+    parser.add_argument('-b', '--aws-bucket', required=True, help='AWS Bucket Name')
     args = parser.parse_args()
 
     bbc_username = args.bbc_username
@@ -342,9 +375,12 @@ def main():
     podcast_path = args.podcast_path
     cache = args.cache
     max_episodes = args.max_episodes
+    aws_access_id = args.aws_access_id
+    aws_secret_key = args.aws_secret_key
+    aws_bucket_name = args.aws_bucket
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    shutil.copy2('logo.png', output_dir)
+    shutil.copy2(LOGO_FILE, output_dir)
     os.chdir(output_dir)
 
     if cache:
@@ -361,7 +397,7 @@ def main():
         download_episodes(episodes)
 
     create_rss_feed(episodes, podcast_path)
-    # copy_to_s3(episodes)
+    sync_with_s3(episodes, aws_access_id, aws_secret_key, aws_bucket_name)
 
 
 if __name__ == '__main__':
