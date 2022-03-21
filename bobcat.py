@@ -319,35 +319,37 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.rss_file(RSS_FILE)
 
 
-def sync_with_s3(episodes, aws_access_id, aws_secret_key, aws_bucket_name):
-    s3 = boto3.resource('s3', aws_access_key_id=aws_access_id, aws_secret_access_key=aws_secret_key)
-    bucket = s3.Bucket(aws_bucket_name)
+def sync_with_s3(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
+    """Upload new and updated files to s3 and delete old ones"""
+
+    s3_client = boto3.resource('s3', aws_access_key_id=aws_access_id, aws_secret_access_key=aws_secret_key)
+    bucket = s3_client.Bucket(s3_bucket_name)
     uploaded = set(object.key for object in bucket.objects.all())
-    
+
     in_feed = set([RSS_FILE, LOGO_FILE])
 
     for episode in episodes:
         in_feed.add(episode.audio_filename)
         in_feed.add(episode.image_filename)
-    
+
     to_upload = in_feed - uploaded
     to_delete = uploaded - in_feed
 
     # Always upload the latest RSS file
     to_upload.add(RSS_FILE)
 
-    print(f'Uploading {len(to_upload)} files to S3 Bucket {aws_bucket_name}')
+    print(f'Uploading {len(to_upload)} files to S3 Bucket {s3_bucket_name}')
 
     for file in to_upload:
         bucket.upload_file(file, file)
-        object = s3.Bucket(aws_bucket_name).Object(file)
-        object.Acl().put(ACL='public-read')
-        print (f'Uploaded {file} to S3 Bucket {aws_bucket_name}')
+        s3_object = s3_client.Bucket(s3_bucket_name).Object(file)
+        s3_object.Acl().put(ACL='public-read')
+        print (f'Uploaded {file} to S3 Bucket {s3_bucket_name}')
 
     if to_delete:
         objects_to_delete = [{'Key': file} for file in to_delete]
         bucket.delete_objects(Delete={'Objects': objects_to_delete})
-        print (f'Removed {",".join(to_delete)} from S3 Bucket {aws_bucket_name}')
+        print (f'Removed {",".join(to_delete)} from S3 Bucket {s3_bucket_name}')
 
 
 def main():
@@ -365,7 +367,7 @@ def main():
     parser.add_argument('-m', '--max_episodes', type=int, help='Maximum number of episodes')
     parser.add_argument('-a', '--aws-access-id', required=True, help='AWS Access Key ID')
     parser.add_argument('-k', '--aws-secret-key', required=True, help='AWS Secret Key')
-    parser.add_argument('-b', '--aws-bucket', required=True, help='AWS Bucket Name')
+    parser.add_argument('-b', '--aws-bucket', required=True, help='AWS S3 Bucket Name')
     args = parser.parse_args()
 
     bbc_username = args.bbc_username
