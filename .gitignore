@@ -131,3 +131,4 @@ dmypy.json
 /etc
 /share
 bin
+/run_bobcat.sh
