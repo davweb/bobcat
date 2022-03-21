@@ -364,7 +364,7 @@ def main():
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
     parser.add_argument('-x', '--podcast-path', required=True, help='Podcast Path Prefix')
     parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using cached data')
-    parser.add_argument('-m', '--max_episodes', type=int, help='Maximum number of episodes')
+    parser.add_argument('-m', '--max-episodes', type=int, help='Maximum number of episodes')
     parser.add_argument('-a', '--aws-access-id', required=True, help='AWS Access Key ID')
     parser.add_argument('-k', '--aws-secret-key', required=True, help='AWS Secret Key')
     parser.add_argument('-b', '--aws-bucket', required=True, help='AWS S3 Bucket Name')
