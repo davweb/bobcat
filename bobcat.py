@@ -127,8 +127,13 @@ class Episode:
         if title.endswith(' - BBC Sounds'):
             title = title[:-13]
 
+        description = synopsis.text
+
+        if description.endswith(' Read less'):
+            description = description[:-10]
+
         self.title = title
-        self.description = synopsis.text
+        self.description = description
         self.image_url = image.get_attribute('src')
 
 
