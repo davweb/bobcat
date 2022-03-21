@@ -24,7 +24,6 @@ URL_BBC_SOUNDS = 'https://www.bbc.co.uk/sounds'
 URL_BBC_MY_SOUNDS = 'https://www.bbc.co.uk/sounds/my?page={}'
 
 DRIVER = None
-OUTPUT_DIR = None
 
 class Episode:
     """Single of episode of a show on BBC Sounds"""
@@ -36,14 +35,21 @@ class Episode:
             self.url = url
             self.episode_id = url.split('/')[-1]
 
-        self.data_directory = f'{OUTPUT_DIR}/{self.episode_id}'
-        self.audio_filename = f'{self.data_directory}/audio.m4a'
-        self.metadata_filename = f'{self.data_directory}/episode.json'
-        self.image_filename = f'{self.data_directory}/image.jpg'
         self.title = None
         self.description = None
         self.image_url = None
 
+    def __getattr__(self, attribute):
+        if attribute == 'audio_filename':
+            return f'{self.episode_id}.m4a'
+
+        if attribute == 'metadata_filename':
+            return f'{self.episode_id}.json'
+
+        if attribute == 'image_filename':
+            return f'{self.episode_id}.jpg'
+
+        raise AttributeError
 
     def is_audio_downloaded(self):
         """Returns true if the audio is downloaded for this episode"""
@@ -85,7 +91,6 @@ class Episode:
             'image_url': self.image_url
         }
 
-        Path(self.data_directory).mkdir(parents=True, exist_ok=True)
         with open(self.metadata_filename, mode='w', encoding='utf8') as metadata:
             metadata.write(json.dumps(episode_metadata))
 
@@ -245,9 +250,9 @@ def load_episodes():
 
     episodes = []
 
-    for directory, _, files in os.walk(OUTPUT_DIR):
-        if 'episode.json' in files:
-            episode_id = Path(directory).relative_to(OUTPUT_DIR).name
+    for file in os.listdir('.'):
+        if file.endswith('.json'):
+            episode_id = file[:-5]
             episode = Episode(episode_id=episode_id)
             episode.load_metadata()
             episodes.append(episode)
@@ -257,8 +262,6 @@ def load_episodes():
 
 def create_rss_feed(episodes, podcast_path):
     """Create the RSS file for the episodes"""
-
-    shutil.copy2('logo.png', OUTPUT_DIR)
     logo_url = f'{podcast_path}/logo.png'
 
     episodes = (episode for episode in episodes if episode.is_downloaded())
@@ -269,7 +272,7 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.title('BBC Sounds Subscriptions')
     feed_generator.description('Episodes of shows I have subscribed to on BBC Sounds')
     feed_generator.author({'name': 'BBC Sounds', 'email': 'sounds@bbc.co.uk'})
-    feed_generator.logo(f'{podcast_path}/logo.png')
+    feed_generator.logo(logo_url)
     feed_generator.link(href=f'{podcast_path}/podcast.xml', rel='self')
     feed_generator.language('en')
 
@@ -303,7 +306,7 @@ def create_rss_feed(episodes, podcast_path):
         feed_entry.podcast.itunes_image(image_url)
 
     feed_generator.rss_str(pretty=True)
-    feed_generator.rss_file(f'{OUTPUT_DIR}/podcast.xml')
+    feed_generator.rss_file('podcast.xml')
 
 
 # def copy_to_s3(episodes):
@@ -315,7 +318,6 @@ def main():
     """Main"""
 
     global DRIVER
-    global OUTPUT_DIR
 
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
     parser.add_argument('-u', '--bbc-username', required=True, help='BBC account username or email')
@@ -330,10 +332,14 @@ def main():
     bbc_username = args.bbc_username
     bbc_password = args.bbc_password
     foreground = args.show_browser
-    OUTPUT_DIR = args.output_dir
+    output_dir = args.output_dir
     podcast_path = args.podcast_path
     cache = args.cache
     max_episodes = args.max_episodes
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    shutil.copy2('logo.png', output_dir)
+    os.chdir(output_dir)
 
     if cache:
         episodes = load_episodes()
