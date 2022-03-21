@@ -165,6 +165,14 @@ def bbc_login(bbc_username, bbc_password):
     submit_button.click()
 
 
+def accept_cookie_prompt():
+    """Click on the accept cookies prompt"""
+
+    DRIVER.get(URL_BBC_SOUNDS)
+    accept_cookies = DRIVER.find_elements(By.CSS_SELECTOR, '#bbccookies-continue-button')
+    accept_cookies[0].click()
+
+
 def get_episodes(max_episodes):
     """Get the episodes of shows subscribed to on BBC Sounds"""
 
@@ -174,13 +182,6 @@ def get_episodes(max_episodes):
     while True:
         page += 1
         DRIVER.get(URL_BBC_MY_SOUNDS.format(page))
-
-        # Click on the accept cookies prompt if it is displayed
-        accept_cookies = DRIVER.find_elements(By.CSS_SELECTOR, '#bbccookies-continue-button')
-
-        if accept_cookies:
-            accept_cookies[0].click()
-
         locations = DRIVER.find_elements(By.CSS_SELECTOR, 'div.sounds-react-app li a[href*="/play/"]')
         page_episode_urls = [anchor.get_attribute('href') for anchor in locations]
         episode_count = len(page_episode_urls)
@@ -346,6 +347,7 @@ def main():
     else:
         DRIVER = initialise_selenium(foreground)
         bbc_login(bbc_username, bbc_password)
+        accept_cookie_prompt()
         episodes = get_episodes(max_episodes)
 
         if not foreground:
