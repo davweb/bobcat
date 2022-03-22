@@ -283,7 +283,12 @@ def convert_episode_audio(episode):
         print(f'Audio for episode {episode.episode_id} already converted')
         return
 
-    audio.export(episode.output_filename, format='mp3', bitrate='128k', cover=episode.image_filename)
+    tags={'title': episode.title}
+
+    # disable writing encoding information as it's wrong and says VBR instead of CBR 
+    parameters = ['-write_xing','0']
+
+    audio.export(episode.output_filename, format='mp3', bitrate='128k', tags=tags, cover=episode.image_filename, parameters=parameters)
     print(f'Converted audio for episode {episode.episode_id}')
 
 
