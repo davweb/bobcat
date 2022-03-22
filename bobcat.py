@@ -311,7 +311,9 @@ def create_rss_feed(episodes, podcast_path):
     """Create the RSS file for the episodes"""
     logo_url = f'{podcast_path}/{LOGO_FILE}'
 
-    episodes = (episode for episode in episodes if episode.is_audio_downloaded())
+    episodes = [episode for episode in episodes if episode.is_audio_downloaded()]
+    publication_date = max(episode.published for episode in episodes)
+    print(publication_date)
 
     feed_generator = FeedGenerator()
     feed_generator.load_extension('podcast')
@@ -323,6 +325,8 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.link(href=URL_BBC_SOUNDS, rel='alternate')
     feed_generator.link(href=f'{podcast_path}/{RSS_FILE}', rel='self')
     feed_generator.language('en')
+    feed_generator.pubDate(publication_date)
+    feed_generator.lastBuildDate(publication_date)
 
     feed_generator.podcast.itunes_category('Arts')
     feed_generator.podcast.itunes_category('Comedy')
