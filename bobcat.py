@@ -8,11 +8,11 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 import boto3
+import pydub
 import pytz
 import requests
 import youtube_dl
 from feedgen.feed import FeedGenerator
-from mutagen.mp4 import MP4
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -42,16 +42,28 @@ class Episode:
         self.title = None
         self.description = None
         self.image_url = None
+        self.duration_in_seconds = None
 
     def __getattr__(self, attribute):
         if attribute == 'audio_filename':
             return f'{self.episode_id}.m4a'
+
+        if attribute == 'output_filename':
+            return f'{self.episode_id}.mp3'
 
         if attribute == 'metadata_filename':
             return f'{self.episode_id}.json'
 
         if attribute == 'image_filename':
             return f'{self.episode_id}.jpg'
+
+        if attribute == 'published':
+            mtime = os.path.getmtime(self.audio_filename)
+            # TODO check Timezone
+            return datetime.fromtimestamp(mtime, pytz.utc)
+
+        if attribute == 'size_in_bytes':
+            return os.path.getsize(self.output_filename)
 
         raise AttributeError
 
@@ -67,10 +79,10 @@ class Episode:
         return Path(self.image_filename).exists()
 
 
-    def is_downloaded(self):
-        """Returns true if the audio and image is downloaded for this episode"""
+    def is_audio_converted(self):
+        """Returns true if the audio has been converted for this episode"""
 
-        return self.is_audio_downloaded() and self.is_image_downloaded()
+        return Path(self.output_filename).exists()
 
 
     def _read_metadata_file(self):
@@ -136,9 +148,14 @@ class Episode:
         if description.endswith(' Read less'):
             description = description[:-10]
 
+        # TODO move this elsewhere and hunt for images
+        # Get a better quality image if possible
+        img_url = image.get_attribute('src')
+        img_url = img_url.replace('320x320', '1600x1600')
+
         self.title = title
         self.description = description
-        self.image_url = image.get_attribute('src')
+        self.image_url = img_url
 
 
 def initialise_selenium(foreground):
@@ -220,6 +237,7 @@ def download_episodes(episodes):
     for episode in episodes:
         download_episode_audio(episode)
         download_episode_image(episode)
+        convert_episode_audio(episode)
 
 
 def download_episode_image(episode):
@@ -243,7 +261,7 @@ def download_episode_audio(episode):
     else:
         ydl_options = {
             'outtmpl': episode.audio_filename,
-            'format': 'm4a'
+            'format': 'bestaudio[ext=m4a]'
         }
 
         with youtube_dl.YoutubeDL(ydl_options) as ydl:
@@ -253,6 +271,20 @@ def download_episode_audio(episode):
                 ydl.download([episode.url])
             except:
                 pass
+
+
+def convert_episode_audio(episode):
+    """Convert the dowloaded mp4 file to mp3 and add cover art"""
+
+    audio = pydub.AudioSegment.from_file(episode.audio_filename)
+    episode.duration_in_seconds = int(audio.duration_seconds)
+
+    if episode.is_audio_converted():
+        print(f'Audio for episode {episode.episode_id} already converted')
+        return
+
+    audio.export(episode.output_filename, format='mp3', bitrate='128k', cover=episode.image_filename)
+    print(f'Converted audio for episode {episode.episode_id}')
 
 
 def load_episodes():
@@ -274,7 +306,7 @@ def create_rss_feed(episodes, podcast_path):
     """Create the RSS file for the episodes"""
     logo_url = f'{podcast_path}/{LOGO_FILE}'
 
-    episodes = (episode for episode in episodes if episode.is_downloaded())
+    episodes = (episode for episode in episodes if episode.is_audio_downloaded())
 
     feed_generator = FeedGenerator()
     feed_generator.load_extension('podcast')
@@ -283,6 +315,7 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.description('Episodes of shows I have subscribed to on BBC Sounds')
     feed_generator.author({'name': 'BBC Sounds', 'email': 'sounds@bbc.co.uk'})
     feed_generator.logo(logo_url)
+    feed_generator.link(href=URL_BBC_SOUNDS, rel='alternate')
     feed_generator.link(href=f'{podcast_path}/{RSS_FILE}', rel='self')
     feed_generator.language('en')
 
@@ -295,28 +328,43 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.podcast.itunes_block(True)
     feed_generator.podcast.itunes_explicit('no')
     feed_generator.podcast.itunes_image(logo_url)
-    feed_generator.podcast.itunes_owner(name='BBC Sounds', email='sounds@bbc.co.uk')
+    feed_generator.podcast.itunes_owner(name='BBC', email='RadioMusic.Support@bbc.co.uk')
 
     for episode in episodes:
-        size_in_bytes = os.path.getsize(episode.audio_filename)
-        mtime = os.path.getmtime(episode.audio_filename)
-        published = datetime.fromtimestamp(mtime, pytz.utc)
-        audio = MP4(episode.audio_filename)
-        duration_in_seconds = int(audio.info.length)
-        audio_url = f'{podcast_path}/{episode.audio_filename}'
+        audio_url = f'{podcast_path}/{episode.output_filename}'
         image_url = f'{podcast_path}/{episode.image_filename}'
 
         feed_entry = feed_generator.add_entry()
         feed_entry.id(audio_url)
         feed_entry.title(episode.title)
         feed_entry.description(episode.description)
-        feed_entry.enclosure(url=audio_url, length=str(size_in_bytes), type='audio/mpeg')
-        feed_entry.published(published)
-        feed_entry.podcast.itunes_duration(duration_in_seconds)
+        feed_entry.enclosure(url=audio_url, length=str(episode.size_in_bytes), type='audio/mpeg')
+        feed_entry.published(episode.published)
+        feed_entry.link(href=episode.url)
+        feed_entry.podcast.itunes_duration(episode.duration_in_seconds)
         feed_entry.podcast.itunes_image(image_url)
+        feed_entry.podcast.itunes_author('BBC Sounds')
 
     feed_generator.rss_str(pretty=True)
     feed_generator.rss_file(RSS_FILE)
+
+
+def get_content_type(filename):
+    """Determine the mime type of each file to be uploaded to S3 by its extension."""
+
+    if filename.endswith('.xml'):
+        return 'application/rss+xml'
+
+    if filename.endswith('.mp3'):
+        return 'audio/mpeg'
+
+    if filename.endswith('.jpg'):
+        return 'image/jpeg'
+
+    if filename.endswith('.png'):
+        return 'image/png'
+
+    raise ValueError(f'Could not determine content type for file "{filename}"')
 
 
 def sync_with_s3(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
@@ -329,7 +377,7 @@ def sync_with_s3(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
     in_feed = set([RSS_FILE, LOGO_FILE])
 
     for episode in episodes:
-        in_feed.add(episode.audio_filename)
+        in_feed.add(episode.output_filename)
         in_feed.add(episode.image_filename)
 
     to_upload = in_feed - uploaded
@@ -341,9 +389,14 @@ def sync_with_s3(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
     print(f'Uploading {len(to_upload)} files to S3 Bucket {s3_bucket_name}')
 
     for file in to_upload:
-        bucket.upload_file(file, file)
-        s3_object = s3_client.Bucket(s3_bucket_name).Object(file)
-        s3_object.Acl().put(ACL='public-read')
+        bucket.upload_file(file, file,
+            ExtraArgs={
+                'ACL': 'public-read',
+                'ContentType': get_content_type(file)
+            }
+        )
+        # s3_object = s3_client.Bucket(s3_bucket_name).Object(file)
+        # s3_object.Acl().put(ACL='public-read')
         print (f'Uploaded {file} to S3 Bucket {s3_bucket_name}')
 
     if to_delete:
