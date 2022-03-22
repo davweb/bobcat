@@ -7,7 +7,6 @@ import json
 import shutil
 from pathlib import Path
 from datetime import datetime
-import boto3
 import pydub
 import pytz
 import requests
@@ -18,7 +17,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
-
+import s3sync
 
 URL_BBC_LOGIN = 'https://account.bbc.com/signin'
 URL_BBC_SOUNDS = 'https://www.bbc.co.uk/sounds'
@@ -285,7 +284,7 @@ def convert_episode_audio(episode):
 
     tags={'title': episode.title}
 
-    # disable writing encoding information as it's wrong and says VBR instead of CBR 
+    # disable writing encoding information as it's wrong and says VBR instead of CBR
     parameters = ['-write_xing','0']
 
     audio.export(episode.output_filename, format='mp3', bitrate='128k', tags=tags, cover=episode.image_filename, parameters=parameters)
@@ -313,7 +312,6 @@ def create_rss_feed(episodes, podcast_path):
 
     episodes = [episode for episode in episodes if episode.is_audio_downloaded()]
     publication_date = max(episode.published for episode in episodes)
-    print(publication_date)
 
     feed_generator = FeedGenerator()
     feed_generator.load_extension('podcast')
@@ -358,66 +356,22 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.rss_file(RSS_FILE)
 
 
-def get_content_type(filename):
-    """Determine the mime type of each file to be uploaded to S3 by its extension."""
+def upload_podcast(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
+    """Upload the podcast by syncing with an S3 bucket"""
 
-    if filename.endswith('.xml'):
-        return 'application/rss+xml'
-
-    if filename.endswith('.mp3'):
-        return 'audio/mpeg'
-
-    if filename.endswith('.jpg'):
-        return 'image/jpeg'
-
-    if filename.endswith('.png'):
-        return 'image/png'
-
-    raise ValueError(f'Could not determine content type for file "{filename}"')
-
-
-def sync_with_s3(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
-    """Upload new and updated files to s3 and delete old ones"""
-
-    s3_client = boto3.resource('s3', aws_access_key_id=aws_access_id, aws_secret_access_key=aws_secret_key)
-    bucket = s3_client.Bucket(s3_bucket_name)
-    uploaded = set(object.key for object in bucket.objects.all())
-
-    in_feed = set([RSS_FILE, LOGO_FILE])
+    files_in_feed = set([RSS_FILE, LOGO_FILE])
 
     for episode in episodes:
-        in_feed.add(episode.output_filename)
-        in_feed.add(episode.image_filename)
+        files_in_feed.add(episode.output_filename)
+        files_in_feed.add(episode.image_filename)
 
-    to_upload = in_feed - uploaded
-    to_delete = uploaded - in_feed
-
-    # Always upload the latest RSS file
-    to_upload.add(RSS_FILE)
-
-    logging.info('Uploading %d files to S3 Bucket %s', len(to_upload), s3_bucket_name)
-
-    for file in to_upload:
-        bucket.upload_file(file, file,
-            ExtraArgs={
-                'ACL': 'public-read',
-                'ContentType': get_content_type(file)
-            }
-        )
-        # s3_object = s3_client.Bucket(s3_bucket_name).Object(file)
-        # s3_object.Acl().put(ACL='public-read')
-        logging.info('Uploaded %s to S3 Bucket %s', file, s3_bucket_name)
-
-    if to_delete:
-        objects_to_delete = [{'Key': file} for file in to_delete]
-        bucket.delete_objects(Delete={'Objects': objects_to_delete})
-        logging.info('Removed %s from S3 Bucket %s', ','.join(to_delete), s3_bucket_name)
+    s3sync.files_with_bucket(aws_access_id, aws_secret_key, s3_bucket_name, files_in_feed)
 
 
 def main():
     """Main"""
 
-    logging.basicConfig(encoding='utf-8', 
+    logging.basicConfig(encoding='utf-8',
         format='%(asctime)s %(levelname)s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
         level=logging.INFO)
@@ -466,7 +420,7 @@ def main():
         download_episodes(episodes)
 
     create_rss_feed(episodes, podcast_path)
-    sync_with_s3(episodes, aws_access_id, aws_secret_key, aws_bucket_name)
+    upload_podcast(episodes, aws_access_id, aws_secret_key, aws_bucket_name)
 
 
 if __name__ == '__main__':
