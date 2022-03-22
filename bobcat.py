@@ -352,8 +352,7 @@ def create_rss_feed(episodes, podcast_path):
         feed_entry.podcast.itunes_image(image_url)
         feed_entry.podcast.itunes_author('BBC Sounds')
 
-    feed_generator.rss_str(pretty=True)
-    feed_generator.rss_file(RSS_FILE)
+    feed_generator.rss_file(RSS_FILE, pretty=True)
 
 
 def upload_podcast(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
