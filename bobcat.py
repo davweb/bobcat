@@ -2,7 +2,7 @@
 
 import argparse
 import os
-
+import logging
 import json
 import shutil
 from pathlib import Path
@@ -116,11 +116,11 @@ class Episode:
 
         try:
             self._read_metadata_file()
-            print(f'Read metadata for {self.episode_id} from file {self.metadata_filename}')
+            logging.info('Read metadata for %s from file %s', self.episode_id, self.metadata_filename)
         except:
             self._fetch_metadata()
             self._write_metadata_file()
-            print(f'Read metadata for {self.episode_id} from website')
+            logging.info('Read metadata for episode %s from website', self.episode_id)
 
 
     def _fetch_metadata(self):
@@ -215,7 +215,7 @@ def get_episodes(max_episodes):
         if episode_count == 0:
             break
 
-        print(f'Found {episode_count} episodes on page {page}')
+        logging.info('Found %d episodes on page %d', episode_count, page)
         episode_urls += page_episode_urls
 
         if len(episode_urls) >= max_episodes:
@@ -244,20 +244,20 @@ def download_episode_image(episode):
     """Download the image files for each episode"""
 
     if episode.is_image_downloaded():
-        print(f'Image for episode {episode.episode_id} already downloaded')
+        logging.info('Image for episode %s already downloaded', episode.episode_id)
     else:
         response = requests.get(episode.image_url, stream=True)
         with open(episode.image_filename, 'wb') as out_file:
             shutil.copyfileobj(response.raw, out_file)
 
-        print(f'Image for episode {episode.episode_id} downloaded from website')
+        logging.info('Image for episode %s downloaded from website', episode.episode_id)
 
 
 def download_episode_audio(episode):
     """Download audio files for each episode"""
 
     if episode.is_audio_downloaded():
-        print(f'Audio for episode {episode.episode_id} already downloaded')
+        logging.info('Audio for episode %s already downloaded', episode.episode_id)
     else:
         ydl_options = {
             'outtmpl': episode.audio_filename,
@@ -280,7 +280,7 @@ def convert_episode_audio(episode):
     episode.duration_in_seconds = int(audio.duration_seconds)
 
     if episode.is_audio_converted():
-        print(f'Audio for episode {episode.episode_id} already converted')
+        logging.info('Audio for episode %s already converted', episode.episode_id)
         return
 
     tags={'title': episode.title}
@@ -289,7 +289,7 @@ def convert_episode_audio(episode):
     parameters = ['-write_xing','0']
 
     audio.export(episode.output_filename, format='mp3', bitrate='128k', tags=tags, cover=episode.image_filename, parameters=parameters)
-    print(f'Converted audio for episode {episode.episode_id}')
+    logging.info('Converted audio for episode %s', episode.episode_id)
 
 
 def load_episodes():
@@ -391,7 +391,7 @@ def sync_with_s3(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
     # Always upload the latest RSS file
     to_upload.add(RSS_FILE)
 
-    print(f'Uploading {len(to_upload)} files to S3 Bucket {s3_bucket_name}')
+    logging.info('Uploading %d files to S3 Bucket %s', len(to_upload), s3_bucket_name)
 
     for file in to_upload:
         bucket.upload_file(file, file,
@@ -402,16 +402,21 @@ def sync_with_s3(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
         )
         # s3_object = s3_client.Bucket(s3_bucket_name).Object(file)
         # s3_object.Acl().put(ACL='public-read')
-        print (f'Uploaded {file} to S3 Bucket {s3_bucket_name}')
+        logging.info('Uploaded %s to S3 Bucket %s', file, s3_bucket_name)
 
     if to_delete:
         objects_to_delete = [{'Key': file} for file in to_delete]
         bucket.delete_objects(Delete={'Objects': objects_to_delete})
-        print (f'Removed {",".join(to_delete)} from S3 Bucket {s3_bucket_name}')
+        logging.info('Removed %s from S3 Bucket %s', ','.join(to_delete), s3_bucket_name)
 
 
 def main():
     """Main"""
+
+    logging.basicConfig(encoding='utf-8', 
+        format='%(asctime)s %(levelname)s %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        level=logging.INFO)
 
     global DRIVER
 
