@@ -8,8 +8,6 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 import pytz
-import requests
-import youtube_dl
 from feedgen.feed import FeedGenerator
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -17,6 +15,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 import audio
+import download
 import s3sync
 
 URL_BBC_LOGIN = 'https://account.bbc.com/signin'
@@ -264,11 +263,7 @@ def download_episode_image(episode):
     if episode.is_image_downloaded():
         logging.info('Image for episode %s already downloaded', episode.episode_id)
     else:
-        response = requests.get(episode.image_url, stream=True)
-        with open(episode.image_filename, 'wb') as out_file:
-            shutil.copyfileobj(response.raw, out_file)
-
-        logging.info('Image for episode %s downloaded from website', episode.episode_id)
+        download.download_file(episode.image_url, episode.image_filename)
 
 
 def download_episode_audio(episode):
@@ -277,18 +272,7 @@ def download_episode_audio(episode):
     if episode.is_audio_downloaded():
         logging.info('Audio for episode %s already downloaded', episode.episode_id)
     else:
-        ydl_options = {
-            'outtmpl': episode.audio_filename,
-            'format': 'bestaudio[ext=m4a]'
-        }
-
-        with youtube_dl.YoutubeDL(ydl_options) as ydl:
-
-            try:
-                # This automatically skips if file is already downloaded
-                ydl.download([episode.url])
-            except:
-                pass
+        download.download_streaming_audio(episode.url, episode.audio_filename)
 
 
 def convert_episode_audio(episode):
