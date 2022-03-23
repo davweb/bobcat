@@ -45,6 +45,12 @@ def _get_content_type(filename):
     raise ValueError(f'Could not determine content type for file "{filename}"')
 
 
+def bucket_url(s3_bucket_name):
+    """Return URL for accessing S3 bucket"""
+
+    return f'https://{s3_bucket_name}.s3.amazonaws.com'
+
+
 def files_with_bucket(aws_access_id, aws_secret_key, s3_bucket_name, files_to_sync):
     """Sync list of files with an s3 bucket
 

@@ -392,7 +392,6 @@ def main():
     parser.add_argument('-p', '--bbc-password', required=True, help='BBC account password')
     parser.add_argument('-s', '--show-browser', action='store_true', help='Show automation browser in the foreground')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
-    parser.add_argument('-x', '--podcast-path', required=True, help='Podcast Path Prefix')
     parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using cached data')
     parser.add_argument('-m', '--max-episodes', type=int, help='Maximum number of episodes')
     parser.add_argument('-a', '--aws-access-id', required=True, help='AWS Access Key ID')
@@ -404,7 +403,6 @@ def main():
     bbc_password = args.bbc_password
     foreground = args.show_browser
     output_dir = args.output_dir
-    podcast_path = args.podcast_path
     cache = args.cache
     max_episodes = args.max_episodes
     aws_access_id = args.aws_access_id
@@ -421,6 +419,7 @@ def main():
         DRIVER = initialise_selenium(foreground)
         bbc_login(bbc_username, bbc_password)
         accept_cookie_prompt()
+
         episodes = get_episodes(max_episodes)
 
         if not foreground:
@@ -428,6 +427,7 @@ def main():
 
         download_episodes(episodes)
 
+    podcast_path = s3sync.bucket_url(aws_bucket_name)
     create_rss_feed(episodes, podcast_path)
     upload_podcast(episodes, aws_access_id, aws_secret_key, aws_bucket_name)
 
