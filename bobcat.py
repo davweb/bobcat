@@ -17,6 +17,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
+import audio
 import s3sync
 
 URL_BBC_LOGIN = 'https://account.bbc.com/signin'
@@ -41,7 +42,6 @@ class Episode:
         self.title = None
         self.description = None
         self.image_url = None
-        self.duration_in_seconds = None
 
     def __getattr__(self, attribute):
         if attribute == 'audio_filename':
@@ -65,6 +65,12 @@ class Episode:
             return os.path.getsize(self.output_filename)
 
         raise AttributeError
+
+
+    def duration_in_seconds(self):
+        """Returns the duration in seconds of the output file as an int"""
+        return audio.duration_in_seconds(self.output_filename)
+
 
     def is_audio_downloaded(self):
         """Returns true if the audio is downloaded for this episode"""
@@ -275,19 +281,17 @@ def download_episode_audio(episode):
 def convert_episode_audio(episode):
     """Convert the dowloaded mp4 file to mp3 and add cover art"""
 
-    audio = pydub.AudioSegment.from_file(episode.audio_filename)
-    episode.duration_in_seconds = int(audio.duration_seconds)
-
     if episode.is_audio_converted():
         logging.info('Audio for episode %s already converted', episode.episode_id)
         return
 
+    audio_segment = pydub.AudioSegment.from_file(episode.audio_filename)
     tags={'title': episode.title}
 
     # disable writing encoding information as it's wrong and says VBR instead of CBR
     parameters = ['-write_xing','0']
 
-    audio.export(episode.output_filename, format='mp3', bitrate='128k', tags=tags, cover=episode.image_filename, parameters=parameters)
+    audio_segment.export(episode.output_filename, format='mp3', bitrate='128k', tags=tags, cover=episode.image_filename, parameters=parameters)
     logging.info('Converted audio for episode %s', episode.episode_id)
 
 
@@ -348,7 +352,7 @@ def create_rss_feed(episodes, podcast_path):
         feed_entry.enclosure(url=audio_url, length=str(episode.size_in_bytes), type='audio/mpeg')
         feed_entry.published(episode.published)
         feed_entry.link(href=episode.url)
-        feed_entry.podcast.itunes_duration(episode.duration_in_seconds)
+        feed_entry.podcast.itunes_duration(episode.duration_in_seconds())
         feed_entry.podcast.itunes_image(image_url)
         feed_entry.podcast.itunes_author('BBC Sounds')
 
