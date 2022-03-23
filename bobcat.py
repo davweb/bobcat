@@ -7,7 +7,6 @@ import json
 import shutil
 from pathlib import Path
 from datetime import datetime
-import pydub
 import pytz
 import requests
 import youtube_dl
@@ -299,14 +298,7 @@ def convert_episode_audio(episode):
         logging.info('Audio for episode %s already converted', episode.episode_id)
         return
 
-    audio_segment = pydub.AudioSegment.from_file(episode.audio_filename)
-    tags={'title': episode.title}
-
-    # disable writing encoding information as it's wrong and says VBR instead of CBR
-    parameters = ['-write_xing','0']
-
-    audio_segment.export(episode.output_filename, format='mp3', bitrate='128k', tags=tags, cover=episode.image_filename, parameters=parameters)
-    logging.info('Converted audio for episode %s', episode.episode_id)
+    audio.convert_to_mp3(episode.audio_filename, episode.output_filename, episode.image_filename, episode.title)
 
 
 def load_episodes():
