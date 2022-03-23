@@ -43,32 +43,46 @@ class Episode:
         self.description = None
         self.image_url = None
 
-    def __getattr__(self, attribute):
-        if attribute == 'audio_filename':
-            return f'{self.episode_id}.m4a'
+    @property
+    def audio_filename(self):
+        """The filename for the downloaded audio file"""
 
-        if attribute == 'output_filename':
-            return f'{self.episode_id}.mp3'
+        return f'{self.episode_id}.m4a'
 
-        if attribute == 'metadata_filename':
-            return f'{self.episode_id}.json'
+    @property
+    def output_filename(self):
+        """The filename for the converted audio file to be uploaded"""
+        return f'{self.episode_id}.mp3'
 
-        if attribute == 'image_filename':
-            return f'{self.episode_id}.jpg'
+    @property
+    def metadata_filename(self):
+        """The filename for metadata file"""
+        return f'{self.episode_id}.json'
 
-        if attribute == 'published':
-            mtime = os.path.getmtime(self.audio_filename)
-            # TODO check Timezone
-            return datetime.fromtimestamp(mtime, pytz.utc)
+    @property
+    def image_filename(self):
+        """The filename for the episode image"""
+        return f'{self.episode_id}.jpg'
 
-        if attribute == 'size_in_bytes':
-            return os.path.getsize(self.output_filename)
+    def published(self):
+        """The publish date for this episode as a datetime
 
-        raise AttributeError
+        The publish date is currently calculated as the last modified time of
+        the downloaded audio file.
+        """
 
+        mtime = os.path.getmtime(self.audio_filename)
+        # TODO check Timezone
+        return datetime.fromtimestamp(mtime, pytz.utc)
+
+    def size_in_bytes(self):
+        """The size in bytes of the output audio file"""
+
+        return os.path.getsize(self.output_filename)
 
     def duration_in_seconds(self):
         """Returns the duration in seconds of the output file as an int"""
+
         return audio.duration_in_seconds(self.output_filename)
 
 
@@ -315,7 +329,7 @@ def create_rss_feed(episodes, podcast_path):
     logo_url = f'{podcast_path}/{LOGO_FILE}'
 
     episodes = [episode for episode in episodes if episode.is_audio_downloaded()]
-    publication_date = max(episode.published for episode in episodes)
+    publication_date = max(episode.published() for episode in episodes)
 
     feed_generator = FeedGenerator()
     feed_generator.load_extension('podcast')
@@ -349,8 +363,8 @@ def create_rss_feed(episodes, podcast_path):
         feed_entry.id(audio_url)
         feed_entry.title(episode.title)
         feed_entry.description(episode.description)
-        feed_entry.enclosure(url=audio_url, length=str(episode.size_in_bytes), type='audio/mpeg')
-        feed_entry.published(episode.published)
+        feed_entry.enclosure(url=audio_url, length=str(episode.size_in_bytes()), type='audio/mpeg')
+        feed_entry.published(episode.published())
         feed_entry.link(href=episode.url)
         feed_entry.podcast.itunes_duration(episode.duration_in_seconds())
         feed_entry.podcast.itunes_image(image_url)
