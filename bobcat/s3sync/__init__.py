@@ -3,7 +3,6 @@
 from functools import cache
 import hashlib
 import logging
-import os
 import boto3
 
 @cache

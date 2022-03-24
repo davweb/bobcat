@@ -9,24 +9,14 @@ from pathlib import Path
 from datetime import datetime
 import pytz
 from feedgen.feed import FeedGenerator
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
-from webdriver_manager.chrome import ChromeDriverManager
-import bobcat.audio as audio
-import bobcat.download as download
-import bobcat.s3sync as s3sync
-
-URL_BBC_LOGIN = 'https://account.bbc.com/signin'
-URL_BBC_SOUNDS = 'https://www.bbc.co.uk/sounds'
-URL_BBC_MY_SOUNDS = 'https://www.bbc.co.uk/sounds/my?page={}'
+from bobcat import audio
+from bobcat import bbc_sounds
+from bobcat import download
+from bobcat import s3sync
 
 RSS_FILE = 'podcast.xml'
 LOGO_FILE = 'logo.png'
 
-DRIVER = None
 
 class Episode:
     """Single of episode of a show on BBC Sounds"""
@@ -144,108 +134,11 @@ class Episode:
     def _fetch_metadata(self):
         """Get information about an episode from the BBC Sounds website"""
 
-        DRIVER.get(self.url)
+        metadata = bbc_sounds.get_episode_metadata(self.url)
 
-        try:
-            show_more = DRIVER.find_element(By.CLASS_NAME, 'sc-c-synopsis__button')
-            show_more.click()
-        except NoSuchElementException:
-            pass
-
-        heading = DRIVER.find_element(By.CSS_SELECTOR, '.sc-c-herospace__details-titles .sc-u-screenreader-only')
-        synopsis = DRIVER.find_element(By.CLASS_NAME, 'sc-c-synopsis')
-        image = DRIVER.find_element(By.CLASS_NAME, 'sc-c-herospace__image')
-
-        title = heading.text
-
-        if title.endswith(' - BBC Sounds'):
-            title = title[:-13]
-
-        description = synopsis.text
-
-        if description.endswith(' Read less'):
-            description = description[:-10]
-
-        # TODO move this elsewhere and hunt for images
-        # Get a better quality image if possible
-        img_url = image.get_attribute('src')
-        img_url = img_url.replace('320x320', '1600x1600')
-
-        self.title = title
-        self.description = description
-        self.image_url = img_url
-
-
-def initialise_selenium(foreground):
-    """Initialise the Selenium driver"""
-    chrome_options = Options()
-
-    if foreground:
-        chrome_options.add_experimental_option('detach', True)
-    else:
-        chrome_options.add_argument('--headless')
-
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    driver.set_window_size(1024, 1280)
-    return driver
-
-
-def clean_up_selenium():
-    """Tidy up Selenium resources"""
-    DRIVER.close()
-
-
-def bbc_login(bbc_username, bbc_password):
-    """Login in to the BBC site"""
-
-    DRIVER.get(URL_BBC_LOGIN)
-    username_field = DRIVER.find_element(By.ID, 'user-identifier-input')
-    username_field.send_keys(bbc_username)
-    password_field = DRIVER.find_element(By.ID, 'password-input')
-    password_field.send_keys(bbc_password)
-    submit_button = DRIVER.find_element(By.ID, 'submit-button')
-    submit_button.click()
-
-
-def accept_cookie_prompt():
-    """Click on the accept cookies prompt"""
-
-    DRIVER.get(URL_BBC_SOUNDS)
-    accept_cookies = DRIVER.find_elements(By.CSS_SELECTOR, '#bbccookies-continue-button')
-    accept_cookies[0].click()
-
-
-def get_episodes(max_episodes):
-    """Get the episodes of shows subscribed to on BBC Sounds"""
-
-    episode_urls = []
-    page = 0
-
-    while True:
-        page += 1
-        DRIVER.get(URL_BBC_MY_SOUNDS.format(page))
-        locations = DRIVER.find_elements(By.CSS_SELECTOR, 'div.sounds-react-app li a[href*="/play/"]')
-        page_episode_urls = [anchor.get_attribute('href') for anchor in locations]
-        episode_count = len(page_episode_urls)
-
-        if episode_count == 0:
-            break
-
-        logging.info('Found %d episodes on page %d', episode_count, page)
-        episode_urls += page_episode_urls
-
-        if len(episode_urls) >= max_episodes:
-            episode_urls = episode_urls[:max_episodes]
-            break
-
-
-    episodes  = [Episode(url) for url in episode_urls]
-
-    for episode in episodes:
-        episode.load_metadata()
-
-    return episodes
+        self.title = metadata['title']
+        self.description = metadata['description']
+        self.image_url = metadata['image_url']
 
 
 def download_episodes(episodes):
@@ -312,9 +205,8 @@ def create_rss_feed(episodes, podcast_path):
 
     feed_generator.title('BBC Sounds Subscriptions')
     feed_generator.description('Episodes of shows I have subscribed to on BBC Sounds')
-    feed_generator.author({'name': 'BBC Sounds', 'email': 'sounds@bbc.co.uk'})
+    feed_generator.author({'name': 'BBC Sounds', 'email': 'RadioMusic.Support@bbc.co.uk'})
     feed_generator.logo(logo_url)
-    feed_generator.link(href=URL_BBC_SOUNDS, rel='alternate')
     feed_generator.link(href=f'{podcast_path}/{RSS_FILE}', rel='self')
     feed_generator.language('en')
     feed_generator.pubDate(publication_date)
@@ -369,12 +261,7 @@ def main():
         datefmt='%Y-%m-%d %H:%M:%S',
         level=logging.INFO)
 
-    global DRIVER
-
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
-    parser.add_argument('-u', '--bbc-username', required=True, help='BBC account username or email')
-    parser.add_argument('-p', '--bbc-password', required=True, help='BBC account password')
-    parser.add_argument('-s', '--show-browser', action='store_true', help='Show automation browser in the foreground')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
     parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using cached data')
     parser.add_argument('-m', '--max-episodes', type=int, help='Maximum number of episodes')
@@ -382,10 +269,6 @@ def main():
     parser.add_argument('-k', '--aws-secret-key', required=True, help='AWS Secret Key')
     parser.add_argument('-b', '--aws-bucket', required=True, help='AWS S3 Bucket Name')
     args = parser.parse_args()
-
-    bbc_username = args.bbc_username
-    bbc_password = args.bbc_password
-    foreground = args.show_browser
     output_dir = args.output_dir
     cache = args.cache
     max_episodes = args.max_episodes
@@ -400,14 +283,11 @@ def main():
     if cache:
         episodes = load_episodes()
     else:
-        DRIVER = initialise_selenium(foreground)
-        bbc_login(bbc_username, bbc_password)
-        accept_cookie_prompt()
+        episode_urls = bbc_sounds.get_episode_urls(max_episodes)
+        episodes = [Episode(url) for url in episode_urls]
 
-        episodes = get_episodes(max_episodes)
-
-        if not foreground:
-            clean_up_selenium()
+        for episode in episodes:
+            episode.load_metadata()
 
         download_episodes(episodes)
 
