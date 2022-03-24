@@ -14,9 +14,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
-import audio
-import download
-import s3sync
+import bobcat.audio as audio
+import bobcat.download as download
+import bobcat.s3sync as s3sync
 
 URL_BBC_LOGIN = 'https://account.bbc.com/signin'
 URL_BBC_SOUNDS = 'https://www.bbc.co.uk/sounds'
