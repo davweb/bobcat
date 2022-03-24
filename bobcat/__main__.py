@@ -14,6 +14,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
+from webdriver_manager.chrome import ChromeDriverManager
 import bobcat.audio as audio
 import bobcat.download as download
 import bobcat.s3sync as s3sync
@@ -184,8 +185,7 @@ def initialise_selenium(foreground):
     else:
         chrome_options.add_argument('--headless')
 
-    chromedriver_path = os.path.join((os.path.dirname(os.path.realpath(__file__))), 'chromedriver')
-    service = Service(chromedriver_path)
+    service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.set_window_size(1024, 1280)
     return driver
