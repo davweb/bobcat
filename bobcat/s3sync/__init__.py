@@ -1,5 +1,6 @@
 """Sync local files with Amazon S3"""
 
+import os
 from functools import cache
 import hashlib
 import logging
@@ -44,13 +45,14 @@ def _get_content_type(filename):
     raise ValueError(f'Could not determine content type for file "{filename}"')
 
 
-def bucket_url(s3_bucket_name):
+def bucket_url():
     """Return URL for accessing S3 bucket"""
 
+    s3_bucket_name = os.environ['S3_BUCKET_NAME']
     return f'https://{s3_bucket_name}.s3.amazonaws.com'
 
 
-def files_with_bucket(aws_access_id, aws_secret_key, s3_bucket_name, files_to_sync):
+def files_with_bucket(files_to_sync):
     """Sync list of files with an s3 bucket
 
     This syncs a list of filenames which should be files in the current working
@@ -58,6 +60,10 @@ def files_with_bucket(aws_access_id, aws_secret_key, s3_bucket_name, files_to_sy
     files in the bucket are deleted.  An 'md5' custom metadata attribute is
     added on upload to determine if files existing in the bucket have changed.
     """
+
+    aws_access_id = os.environ['AWS_ACCESS_ID']
+    aws_secret_key = os.environ['AWS_SECRET_KEY']
+    s3_bucket_name = os.environ['S3_BUCKET_NAME']
 
     s3_client = boto3.resource('s3', aws_access_key_id=aws_access_id, aws_secret_access_key=aws_secret_key)
     bucket = s3_client.Bucket(s3_bucket_name)

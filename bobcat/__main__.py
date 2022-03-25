@@ -241,7 +241,7 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.rss_file(RSS_FILE, pretty=True)
 
 
-def upload_podcast(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
+def upload_podcast(episodes):
     """Upload the podcast by syncing with an S3 bucket"""
 
     files_in_feed = set([RSS_FILE, LOGO_FILE])
@@ -250,7 +250,7 @@ def upload_podcast(episodes, aws_access_id, aws_secret_key, s3_bucket_name):
         files_in_feed.add(episode.output_filename)
         files_in_feed.add(episode.image_filename)
 
-    s3sync.files_with_bucket(aws_access_id, aws_secret_key, s3_bucket_name, files_in_feed)
+    s3sync.files_with_bucket(files_in_feed)
 
 
 def main():
@@ -265,16 +265,10 @@ def main():
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
     parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using cached data')
     parser.add_argument('-m', '--max-episodes', type=int, help='Maximum number of episodes')
-    parser.add_argument('-a', '--aws-access-id', required=True, help='AWS Access Key ID')
-    parser.add_argument('-k', '--aws-secret-key', required=True, help='AWS Secret Key')
-    parser.add_argument('-b', '--aws-bucket', required=True, help='AWS S3 Bucket Name')
     args = parser.parse_args()
     output_dir = args.output_dir
     cache = args.cache
     max_episodes = args.max_episodes
-    aws_access_id = args.aws_access_id
-    aws_secret_key = args.aws_secret_key
-    aws_bucket_name = args.aws_bucket
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     shutil.copy2(LOGO_FILE, output_dir)
@@ -291,9 +285,9 @@ def main():
 
         download_episodes(episodes)
 
-    podcast_path = s3sync.bucket_url(aws_bucket_name)
+    podcast_path = s3sync.bucket_url()
     create_rss_feed(episodes, podcast_path)
-    upload_podcast(episodes, aws_access_id, aws_secret_key, aws_bucket_name)
+    upload_podcast(episodes)
 
 
 if __name__ == '__main__':
