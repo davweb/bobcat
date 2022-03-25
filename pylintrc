@@ -1,2 +1,5 @@
 [TYPECHECK]
 ignored-classes=FeedGenerator,FeedEntry
+
+[FORMAT]
+max-line-length=120
