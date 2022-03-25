@@ -10,7 +10,8 @@ def duration_in_seconds(filename):
 
     try:
         return int(float(info['duration'])) + 1
-    except:
+    except KeyError:
+        logging.warning('No duration found for audio file %s', filename)
         return None
 
 
