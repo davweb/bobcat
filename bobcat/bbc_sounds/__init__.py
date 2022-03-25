@@ -9,6 +9,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
+from bobcat import download
 
 _URL_BBC_LOGIN = 'https://account.bbc.com/signin'
 _URL_BBC_SOUNDS = 'https://www.bbc.co.uk/sounds'
@@ -125,10 +126,16 @@ def get_episode_metadata(url):
     if description.endswith(' Read less'):
         description = description[:-10]
 
-    # TODO move this elsewhere and hunt for images
-    # Get a better quality image if possible
     image_url = image.get_attribute('src')
-    image_url = image_url.replace('320x320', '1600x1600')
+
+    # Get a better quality image if possible
+    larger_image_url = image_url.replace('320x320', '1600x1600')
+
+    if larger_image_url != image_url and download.url_gettable(larger_image_url):
+        image_url = larger_image_url
+    else:
+        logging.warning('Could not find larger image %s', larger_image_url)
+
 
     return {
         'title': title,

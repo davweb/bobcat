@@ -6,14 +6,14 @@ import logging
 import json
 import shutil
 from pathlib import Path
-from datetime import datetime
-import pytz
+from datetime import datetime, timezone
 from feedgen.feed import FeedGenerator
 from bobcat import audio
 from bobcat import bbc_sounds
 from bobcat import download
 from bobcat import s3sync
 
+LOCAL_TIMEZONE = datetime.now(timezone.utc).astimezone().tzinfo
 RSS_FILE = 'podcast.xml'
 LOGO_FILE = 'logo.png'
 
@@ -61,8 +61,8 @@ class Episode:
         """
 
         mtime = os.path.getmtime(self.audio_filename)
-        # TODO check Timezone
-        return datetime.fromtimestamp(mtime, pytz.utc)
+        # Assume mtime is in platform timezone
+        return datetime.fromtimestamp(mtime, tz=LOCAL_TIMEZONE)
 
     def size_in_bytes(self):
         """The size in bytes of the output audio file"""
