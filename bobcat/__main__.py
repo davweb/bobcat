@@ -3,30 +3,36 @@
 import argparse
 import os
 import logging
-import json
 import shutil
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import timezone
 from feedgen.feed import FeedGenerator
+from sqlalchemy import create_engine, Column, String, DateTime
+from sqlalchemy.orm import declarative_base, sessionmaker
 from bobcat import audio
 from bobcat import bbc_sounds
 from bobcat import download
 from bobcat import s3sync
 
-LOCAL_TIMEZONE = datetime.now(timezone.utc).astimezone().tzinfo
 RSS_FILE = 'podcast.xml'
 LOGO_FILE = 'logo.png'
 
+Base = declarative_base()
 
-class Episode:
+class Episode(Base):
     """Single of episode of a show on BBC Sounds"""
 
-    def __init__(self, url=None, episode_id=None):
-        if episode_id:
-            self.episode_id = episode_id
-        else:
-            self.url = url
-            self.episode_id = url.split('/')[-1]
+    __tablename__ = 'episodes'
+    episode_id = Column(String, primary_key=True)
+    url = Column(String)
+    title = Column(String)
+    description = Column(String)
+    image_url = Column(String)
+    published_utc = Column('published', DateTime())
+
+    def __init__(self, url):
+        self.url = url
+        self.episode_id = url.split('/')[-1]
 
         self.title = None
         self.description = None
@@ -44,25 +50,14 @@ class Episode:
         return f'{self.episode_id}.mp3'
 
     @property
-    def metadata_filename(self):
-        """The filename for metadata file"""
-        return f'{self.episode_id}.json'
-
-    @property
     def image_filename(self):
         """The filename for the episode image"""
         return f'{self.episode_id}.jpg'
 
     def published(self):
-        """The publish date for this episode as a datetime
+        """The publish date for this episode as a datetime with a timezone"""
 
-        The publish date is currently calculated as the last modified time of
-        the downloaded audio file.
-        """
-
-        mtime = os.path.getmtime(self.audio_filename)
-        # Assume mtime is in platform timezone
-        return datetime.fromtimestamp(mtime, tz=LOCAL_TIMEZONE)
+        return self.published_utc.replace(tzinfo=timezone.utc)
 
     def size_in_bytes(self):
         """The size in bytes of the output audio file"""
@@ -93,52 +88,16 @@ class Episode:
         return Path(self.output_filename).exists()
 
 
-    def _read_metadata_file(self):
-        with open(self.metadata_filename, encoding='utf8') as metadata:
-            episode_metadata = json.loads(metadata.read())
-
-        if episode_metadata['id'] != self.episode_id:
-            raise ValueError()
-
-        self.url = episode_metadata['url']
-        self.title = episode_metadata['title']
-        self.description = episode_metadata['description']
-        self.image_url = episode_metadata['image_url']
-
-
-    def _write_metadata_file(self):
-        episode_metadata = {
-            'id': self.episode_id,
-            'url': self.url,
-            'title': self.title,
-            'description': self.description,
-            'image_url': self.image_url
-        }
-
-        with open(self.metadata_filename, mode='w', encoding='utf8') as metadata:
-            metadata.write(json.dumps(episode_metadata))
-
-
     def load_metadata(self):
         """Get metadata from local cache or from website"""
 
-        try:
-            self._read_metadata_file()
-            logging.info('Read metadata for %s from file %s', self.episode_id, self.metadata_filename)
-        except:
-            self._fetch_metadata()
-            self._write_metadata_file()
+        if self.title is None or self.description is None or self.image_url is None:
+            metadata = bbc_sounds.get_episode_metadata(self.url)
+            self.title = metadata['title']
+            self.description = metadata['synopsis']
+            self.image_url = metadata['image_url']
+            self.published_utc = metadata['availability_from']
             logging.info('Read metadata for episode %s from website', self.episode_id)
-
-
-    def _fetch_metadata(self):
-        """Get information about an episode from the BBC Sounds website"""
-
-        metadata = bbc_sounds.get_episode_metadata(self.url)
-
-        self.title = metadata['title']
-        self.description = metadata['description']
-        self.image_url = metadata['image_url']
 
 
 def download_episodes(episodes):
@@ -176,21 +135,6 @@ def convert_episode_audio(episode):
         return
 
     audio.convert_to_mp3(episode.audio_filename, episode.output_filename, episode.image_filename, episode.title)
-
-
-def load_episodes():
-    """Create episodes from local data rather than the BBC Sounds website"""
-
-    episodes = []
-
-    for file in os.listdir('.'):
-        if file.endswith('.json'):
-            episode_id = file[:-5]
-            episode = Episode(episode_id=episode_id)
-            episode.load_metadata()
-            episodes.append(episode)
-
-    return episodes
 
 
 def create_rss_feed(episodes, podcast_path):
@@ -263,31 +207,48 @@ def main():
 
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
-    parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using cached data')
+    parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using only cached data')
     parser.add_argument('-m', '--max-episodes', type=int, help='Maximum number of episodes')
     args = parser.parse_args()
     output_dir = args.output_dir
-    cache = args.cache
+    cache_only = args.cache
     max_episodes = args.max_episodes
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     shutil.copy2(LOGO_FILE, output_dir)
     os.chdir(output_dir)
 
-    if cache:
-        episodes = load_episodes()
-    else:
-        episode_urls = bbc_sounds.get_episode_urls(max_episodes)
-        episodes = [Episode(url) for url in episode_urls]
+    engine = create_engine('sqlite:///bobcat.db', echo=False)
+    session_maker = sessionmaker(engine)
+    Base.metadata.create_all(engine)
 
-        for episode in episodes:
-            episode.load_metadata()
+    with session_maker() as session:
+        query = session.query(Episode)
 
+        if not cache_only:
+            episode_urls = bbc_sounds.get_episode_urls(max_episodes)
+            episodes = []
+
+            for url in episode_urls:
+                episode = query.filter(Episode.url == url).one_or_none()
+
+                if episode is None:
+                    episode = Episode(url)
+                    session.add(episode)
+
+                episodes.append(episode)
+
+            for episode in episodes:
+                episode.load_metadata()
+
+            session.commit()
+
+        episodes = query.filter().order_by(Episode.published_utc.desc()).limit(max_episodes).all()
         download_episodes(episodes)
 
-    podcast_path = s3sync.bucket_url()
-    create_rss_feed(episodes, podcast_path)
-    upload_podcast(episodes)
+        podcast_path = s3sync.bucket_url()
+        create_rss_feed(episodes, podcast_path)
+        upload_podcast(episodes)
 
 
 if __name__ == '__main__':
