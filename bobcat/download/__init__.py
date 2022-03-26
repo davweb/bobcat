@@ -31,10 +31,3 @@ def download_streaming_audio(url, output_filename):
         ydl.download([url])
 
     logging.info('Downloaded audio from %s to file %s', url, output_filename)
-
-
-def url_gettable(url):
-    """Tests if a URL is gettable"""
-
-    response = requests.head(url)
-    return response.status_code == 200

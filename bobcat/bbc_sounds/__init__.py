@@ -3,6 +3,7 @@
 import atexit
 import logging
 import os
+from dateutil import parser
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -106,39 +107,37 @@ def get_episode_metadata(url):
     driver = _get_driver()
     driver.get(url)
 
-    try:
-        show_more = driver.find_element(By.CLASS_NAME, 'sc-c-synopsis__button')
-        show_more.click()
-    except NoSuchElementException:
-        pass
+    data = driver.execute_script('return window.__PRELOADED_STATE__;')
+    programme = data['programmes']['current']
 
-    heading = driver.find_element(By.CSS_SELECTOR, '.sc-c-herospace__details-titles .sc-u-screenreader-only')
-    synopsis = driver.find_element(By.CLASS_NAME, 'sc-c-synopsis')
-    image = driver.find_element(By.CLASS_NAME, 'sc-c-herospace__image')
+    titles = programme['titles']
+    title = titles['primary']
 
-    title = heading.text
+    if titles['secondary'] is not None:
+        title += ' - ' + titles['secondary']
 
-    if title.endswith(' - BBC Sounds'):
-        title = title[:-13]
+    if titles['tertiary'] is not None:
+        title += ' - ' + titles['tertiary']
 
-    description = synopsis.text
+    description = None
+    synopses = programme['synopses']
 
-    if description.endswith(' Read less'):
-        description = description[:-10]
+    for kind in ['long', 'medium', 'short']:
+        synopsis = synopses[kind]
 
-    image_url = image.get_attribute('src')
+        if synopsis is not None:
+            description = synopsis
+            break
 
-    # Get a better quality image if possible
-    larger_image_url = image_url.replace('320x320', '1600x1600')
+    if description is None:
+        logging.warning('Did not find description on page %s', url)
 
-    if larger_image_url != image_url and download.url_gettable(larger_image_url):
-        image_url = larger_image_url
-    else:
-        logging.warning('Could not find larger image %s', larger_image_url)
-
+    image_url = programme['image_url'].replace('{recipe}', '1600x1600')
+    availability_from = parser.parse(programme['availability']['from'])
 
     return {
         'title': title,
-        'description': description,
-        'image_url': image_url
+        'synopsis': synopsis,
+        'image_url': image_url,
+        'availability_from': availability_from
     }
