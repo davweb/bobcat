@@ -1,18 +1,22 @@
-FROM alpine:3.15.2
+FROM alpine:3.15.2 as base
+
+FROM base as builder
+# Install python and the dependencies we need to build the python dependencies
+RUN apk add --no-cache python3 gcc musl-dev libffi-dev python3-dev 
+# Build a virtual env to build the python dependencies in to
+RUN python3 -m venv /app/venv
+# Install python dependenices into temporary build image
+COPY requirements.txt /app
+RUN source /app/venv/bin/activate && pip3 install --requirement /app/requirements.txt
+
+FROM base
+# Install python and runtime dependencies
+RUN apk add --no-cache python3 ffmpeg chromium chromium-chromedriver
+# Copy the build python dependencies from the other image
+COPY --from=builder /app/venv /app/venv
+# Copy the app files
+COPY bobcat /app/bobcat
+COPY logo.png entrypoint.sh /app
+# Make python unbuffered to keep logs as up to date as possible
 ENV PYTHONUNBUFFERED=1
-RUN apk add --update --no-cache python3
-RUN ln -sf python3 /usr/bin/python
-RUN python -m ensurepip
-RUN pip3 install --no-cache --upgrade pip setuptools
-# TODO use multipart build to avoid gcc etc in final image 
-RUN apk add gcc musl-dev libffi-dev python3-dev 
-COPY requirements.txt .
-RUN pip3 install -r requirements.txt
-
-RUN apk add ffmpeg
-RUN apk add chromium chromium-chromedriver
-
-WORKDIR /app
-COPY bobcat ./bobcat
-COPY logo.png entrypoint.sh .
-CMD sh /app/entrypoint.sh
+CMD source /app/venv/bin/activate && sh /app/entrypoint.sh
