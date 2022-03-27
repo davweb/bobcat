@@ -45,7 +45,7 @@ def _get_driver():
 
 def clean_up_selenium():
     """Tidy up Selenium resources"""
-    _DRIVER.close()
+    _DRIVER.quit()
 
 
 def _bbc_login():
@@ -97,7 +97,6 @@ def get_episode_urls(max_episodes):
             episode_urls = episode_urls[:max_episodes]
             break
 
-
     return episode_urls
 
 
@@ -134,6 +133,9 @@ def get_episode_metadata(url):
 
     image_url = programme['image_url'].replace('{recipe}', '1600x1600')
     availability_from = parser.parse(programme['availability']['from'])
+
+    # Navigate away from programme page so audio doesn't start playing
+    driver.get(_URL_BBC_SOUNDS)
 
     return {
         'title': title,
