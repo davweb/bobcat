@@ -3,20 +3,29 @@
 import atexit
 import logging
 import os
+from pathlib import Path
 from dateutil import parser
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
-from webdriver_manager.chrome import ChromeDriverManager
 from bobcat import download
 
 _URL_BBC_LOGIN = 'https://account.bbc.com/signin'
 _URL_BBC_SOUNDS = 'https://www.bbc.co.uk/sounds'
 _URL_BBC_MY_SOUNDS = 'https://www.bbc.co.uk/sounds/my?page={}'
 
+# For the container we can use the default chromedriver installed by apk
+# For development we can get webdriver-manager to download it for us
+_DEFAULT_CHROMEDRIVER_PATH = '/usr/bin/chromedriver'
+_USE_DEFAULT_CHROMEDRIVER = Path(_DEFAULT_CHROMEDRIVER_PATH).exists()
+
+if not _USE_DEFAULT_CHROMEDRIVER:
+    from webdriver_manager.chrome import ChromeDriverManager
+
 _DRIVER = None
+
 
 def _get_driver():
     """Initialise the Selenium driver"""
@@ -31,9 +40,18 @@ def _get_driver():
             chrome_options.add_experimental_option('detach', True)
         else:
             chrome_options.add_argument('--headless')
+
+            # these options required to get chrome working in the Alpine docker container
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+
             atexit.register(clean_up_selenium)
 
-        service = Service(ChromeDriverManager().install())
+        if _USE_DEFAULT_CHROMEDRIVER:
+            service = Service(_DEFAULT_CHROMEDRIVER_PATH)
+        else:
+            service = Service(ChromeDriverManager().install())
+
         _DRIVER = webdriver.Chrome(service=service, options=chrome_options)
         _DRIVER.set_window_size(1024, 1280)
 
