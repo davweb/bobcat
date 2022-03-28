@@ -108,7 +108,7 @@ def get_episode_urls(max_episodes):
         if episode_count == 0:
             break
 
-        logging.info('Found %d episodes on page %d', episode_count, page)
+        logging.debug('Found %d episodes on page %d', episode_count, page)
         episode_urls += page_episode_urls
 
         if len(episode_urls) >= max_episodes:

@@ -14,7 +14,7 @@ def download_file(url, output_filename):
     with open(output_filename, 'wb') as output_file:
         shutil.copyfileobj(response.raw, output_file)
 
-    logging.info('Downloaded %s to file %s', url, output_filename)
+    logging.debug('Downloaded %s to file %s', url, output_filename)
 
 
 def download_streaming_audio(url, output_filename):
@@ -30,4 +30,4 @@ def download_streaming_audio(url, output_filename):
     with youtube_dl.YoutubeDL(ydl_options) as ydl:
         ydl.download([url])
 
-    logging.info('Downloaded audio from %s to file %s', url, output_filename)
+    logging.debug('Downloaded audio from %s to file %s', url, output_filename)

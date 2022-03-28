@@ -97,7 +97,7 @@ class Episode(Base):
             self.description = metadata['synopsis']
             self.image_url = metadata['image_url']
             self.published_utc = metadata['availability_from']
-            logging.info('Read metadata for episode %s from website', self.episode_id)
+            logging.debug('Read metadata for episode %s from website', self.episode_id)
 
 
 def download_episodes(episodes):
@@ -113,7 +113,7 @@ def download_episode_image(episode):
     """Download the image files for each episode"""
 
     if episode.is_image_downloaded():
-        logging.info('Image for episode %s already downloaded', episode.episode_id)
+        logging.debug('Image for episode %s already downloaded', episode.episode_id)
     else:
         download.download_file(episode.image_url, episode.image_filename)
 
@@ -122,7 +122,7 @@ def download_episode_audio(episode):
     """Download audio files for each episode"""
 
     if episode.is_audio_downloaded():
-        logging.info('Audio for episode %s already downloaded', episode.episode_id)
+        logging.debug('Audio for episode %s already downloaded', episode.episode_id)
     else:
         download.download_streaming_audio(episode.url, episode.audio_filename)
 
@@ -131,7 +131,7 @@ def convert_episode_audio(episode):
     """Convert the dowloaded mp4 file to mp3 and add cover art"""
 
     if episode.is_audio_converted():
-        logging.info('Audio for episode %s already converted', episode.episode_id)
+        logging.debug('Audio for episode %s already converted', episode.episode_id)
         return
 
     audio.convert_to_mp3(episode.audio_filename, episode.output_filename, episode.image_filename, episode.title)
@@ -226,13 +226,16 @@ def main():
         query = session.query(Episode)
 
         if not cache_only:
+            logging.info('Fetching episode list')
             episode_urls = bbc_sounds.get_episode_urls(max_episodes)
             episodes = []
+            new_episode_count = 0
 
             for url in episode_urls:
                 episode = query.filter(Episode.url == url).one_or_none()
 
                 if episode is None:
+                    new_episode_count += 1
                     episode = Episode(url)
                     session.add(episode)
 
@@ -242,6 +245,7 @@ def main():
                 episode.load_metadata()
 
             session.commit()
+            logging.info('Found %d new episodes', new_episode_count)
 
         episodes = query.filter().order_by(Episode.published_utc.desc()).limit(max_episodes).all()
         download_episodes(episodes)

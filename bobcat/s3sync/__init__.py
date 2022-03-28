@@ -81,7 +81,7 @@ def files_with_bucket(files_to_sync):
         local_md5 = _file_md5(filename)
 
         if remote_md5 == local_md5:
-            logging.info('Skipping %s as unmodified since last upload', filename)
+            logging.debug('Skipping %s as unmodified since last upload', filename)
         else:
             to_upload.add(filename)
 
@@ -95,7 +95,7 @@ def files_with_bucket(files_to_sync):
                 'Metadata': {'md5': _file_md5(filename)}
             }
         )
-        logging.info('Uploaded %s to S3 Bucket %s', filename, s3_bucket_name)
+        logging.debug('Uploaded %s to S3 Bucket %s', filename, s3_bucket_name)
 
     if to_delete:
         objects_to_delete = [{'Key': filename} for filename in to_delete]
