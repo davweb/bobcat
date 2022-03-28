@@ -6,7 +6,7 @@ do
 
   if [ -z "${VALUE}" ]
   then
-    echo Environment variable ${VAR} is not set >&2
+    echo Environment variable ${VAR} is not set. >&2
     MISSING_VARIABLE=TRUE
   fi
 done
@@ -17,7 +17,8 @@ then
     exit 3
 fi
 
-# TODO add to cron and cat log if option set
+# Run now 
+/app/run.sh
 
-cd /app
-python -m bobcat -o /app/downloads -m 15
+# Start cron in foreground for scheduled runs
+crond -f -l 8
