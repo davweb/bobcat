@@ -197,13 +197,24 @@ def upload_podcast(episodes):
     s3sync.files_with_bucket(files_in_feed)
 
 
-def main():
-    """Main"""
+def configure_logging():
+    """Configure logging"""
+
+    log_level_name = os.environ.get('LOG_LEVEL', 'INFO')
+    log_level = logging.getLevelName(log_level_name)
+
+    if isinstance(log_level, str):
+        raise ValueError(f'Invalid LOG_LEVEL: {log_level_name}')
 
     logging.basicConfig(encoding='utf-8',
         format='%(asctime)s %(levelname)s %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        level=logging.INFO)
+        datefmt='[%Y-%m-%dT%H:%M:%S%z]',
+        level=log_level)
+
+def main():
+    """Main"""
+
+    configure_logging()
 
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
