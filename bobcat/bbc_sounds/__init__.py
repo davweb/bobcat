@@ -50,7 +50,7 @@ def _get_driver():
         if _USE_DEFAULT_CHROMEDRIVER:
             service = Service(_DEFAULT_CHROMEDRIVER_PATH)
         else:
-            service = Service(ChromeDriverManager().install())
+            service = Service(ChromeDriverManager(log_level=0).install())
 
         _DRIVER = webdriver.Chrome(service=service, options=chrome_options)
         _DRIVER.set_window_size(1024, 1280)

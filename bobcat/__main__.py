@@ -115,6 +115,7 @@ def download_episode_image(episode):
     if episode.is_image_downloaded():
         logging.debug('Image for episode %s already downloaded', episode.episode_id)
     else:
+        logging.debug('Downloading image for episode %s', episode.episode_id)
         download.download_file(episode.image_url, episode.image_filename)
 
 
@@ -124,6 +125,7 @@ def download_episode_audio(episode):
     if episode.is_audio_downloaded():
         logging.debug('Audio for episode %s already downloaded', episode.episode_id)
     else:
+        logging.info('Downloading audio for episode %s', episode.episode_id)
         download.download_streaming_audio(episode.url, episode.audio_filename)
 
 
@@ -134,6 +136,7 @@ def convert_episode_audio(episode):
         logging.debug('Audio for episode %s already converted', episode.episode_id)
         return
 
+    logging.info('Coverting audio for episode %s', episode.episode_id)
     audio.convert_to_mp3(episode.audio_filename, episode.output_filename, episode.image_filename, episode.title)
 
 
@@ -233,7 +236,7 @@ def main():
 
     if cache_only:
         logging.info('Generating feed using only cached data')
-        
+
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     shutil.copy2(LOGO_FILE, output_dir)
     os.chdir(output_dir)
