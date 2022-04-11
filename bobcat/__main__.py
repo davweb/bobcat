@@ -197,7 +197,7 @@ def upload_podcast(episodes):
     s3sync.files_with_bucket(files_in_feed)
 
 
-def configure_logging():
+def configure_logging(logfile):
     """Configure logging"""
 
     log_level_name = os.environ.get('LOG_LEVEL', 'INFO')
@@ -207,6 +207,7 @@ def configure_logging():
         raise ValueError(f'Invalid LOG_LEVEL: {log_level_name}')
 
     logging.basicConfig(encoding='utf-8',
+        filename=logfile,
         format='%(asctime)s %(levelname)s %(message)s',
         datefmt='[%Y-%m-%dT%H:%M:%S%z]',
         level=log_level)
@@ -214,17 +215,25 @@ def configure_logging():
 def main():
     """Main"""
 
-    configure_logging()
-
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
     parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using only cached data')
     parser.add_argument('-m', '--max-episodes', type=int, help='Maximum number of episodes')
+    parser.add_argument('-l', '--logfile', type=Path)
     args = parser.parse_args()
     output_dir = args.output_dir
     cache_only = args.cache
     max_episodes = args.max_episodes
+    logfile = args.logfile
 
+    configure_logging(logfile)
+    logging.info('Starting')
+    logging.debug('Max episodes: %d', max_episodes)
+    logging.debug('Output directory: %s', output_dir)
+
+    if cache_only:
+        logging.info('Generating feed using only cached data')
+        
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     shutil.copy2(LOGO_FILE, output_dir)
     os.chdir(output_dir)
@@ -264,7 +273,8 @@ def main():
         podcast_path = s3sync.bucket_url()
         create_rss_feed(episodes, podcast_path)
         upload_podcast(episodes)
-
+    
+    logging.info('Finished')
 
 if __name__ == '__main__':
     main()
