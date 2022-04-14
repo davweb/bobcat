@@ -39,7 +39,12 @@ def _get_driver():
         if foreground:
             chrome_options.add_experimental_option('detach', True)
         else:
+            # Run headless 
             chrome_options.add_argument('--headless')
+
+            # these options improve performance in a container
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--disable-software-rasterizer')
 
             # these options required to get chrome working in the Alpine docker container
             chrome_options.add_argument('--no-sandbox')

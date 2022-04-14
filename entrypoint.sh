@@ -21,4 +21,4 @@ fi
 /app/run.sh
 
 # Start cron in foreground for scheduled runs
-crond -f -l 8
+exec crond -f -l 8

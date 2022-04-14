@@ -22,12 +22,12 @@ COPY --from=builder /app/venv /app/venv
 WORKDIR /app
 
 # Copy the app files
-COPY bobcat /app/bobcat
+COPY bobcat bobcat
 COPY logo.png entrypoint.sh run.sh .
 RUN chmod +x run.sh
 
 # Set up crontab
-ADD crontab.txt .
+COPY crontab.txt .
 RUN /usr/bin/crontab crontab.txt
 
 # Make python unbuffered to keep logs as up to date as possible
