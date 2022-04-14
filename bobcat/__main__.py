@@ -115,7 +115,7 @@ def download_episode_image(episode):
     if episode.is_image_downloaded():
         logging.debug('Image for episode %s already downloaded', episode.episode_id)
     else:
-        logging.debug('Downloading image for episode %s', episode.episode_id)
+        logging.info('Downloading image for episode %s', episode.episode_id)
         download.download_file(episode.image_url, episode.image_filename)
 
 
