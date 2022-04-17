@@ -188,7 +188,7 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.rss_file(RSS_FILE, pretty=True)
 
 
-def upload_podcast(episodes):
+def upload_podcast(episodes, preview_mode):
     """Upload the podcast by syncing with an S3 bucket"""
 
     files_in_feed = set([RSS_FILE, LOGO_FILE])
@@ -197,7 +197,7 @@ def upload_podcast(episodes):
         files_in_feed.add(episode.output_filename)
         files_in_feed.add(episode.image_filename)
 
-    s3sync.files_with_bucket(files_in_feed)
+    s3sync.files_with_bucket(files_in_feed, preview_mode)
 
 
 def configure_logging(logfile):
@@ -220,12 +220,14 @@ def main():
 
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
-    parser.add_argument('-c', '--cache', action='store_true', help='Generate feed using only cached data')
+    parser.add_argument('-e', '--no-episode-refresh', action='store_true', help='Generate feed using only cached episode data')
+    parser.add_argument('-u', '--no-upload', action='store_true', help='Preview S3 changes without actually making them')
     parser.add_argument('-m', '--max-episodes', type=int, help='Maximum number of episodes')
     parser.add_argument('-l', '--logfile', type=Path)
     args = parser.parse_args()
     output_dir = args.output_dir
-    cache_only = args.cache
+    cache_only = args.no_episode_refresh
+    preview_mode = args.no_upload
     max_episodes = args.max_episodes
     logfile = args.logfile
 
@@ -236,6 +238,9 @@ def main():
 
     if cache_only:
         logging.info('Generating feed using only cached data')
+
+    if preview_mode:
+        logging.info('Showing changes to S3 but not making them')
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     shutil.copy2(LOGO_FILE, output_dir)
@@ -275,8 +280,8 @@ def main():
 
         podcast_path = s3sync.bucket_url()
         create_rss_feed(episodes, podcast_path)
-        upload_podcast(episodes)
-    
+        upload_podcast(episodes, preview_mode)
+
     logging.info('Finished')
 
 if __name__ == '__main__':

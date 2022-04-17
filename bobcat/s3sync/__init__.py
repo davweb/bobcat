@@ -52,7 +52,7 @@ def bucket_url():
     return f'https://{s3_bucket_name}.s3.amazonaws.com'
 
 
-def files_with_bucket(files_to_sync):
+def files_with_bucket(files_to_sync, preview):
     """Sync list of files with an s3 bucket
 
     This syncs a list of filenames which should be files in the current working
@@ -88,16 +88,24 @@ def files_with_bucket(files_to_sync):
     logging.info('Uploading %d files to S3 Bucket %s', len(to_upload), s3_bucket_name)
 
     for filename in to_upload:
-        bucket.upload_file(filename, filename,
-            ExtraArgs={
-                'ACL': 'public-read',
-                'ContentType': _get_content_type(filename),
-                'Metadata': {'md5': _file_md5(filename)}
-            }
-        )
-        logging.debug('Uploaded %s to S3 Bucket %s', filename, s3_bucket_name)
+        if preview:
+            logging.info('Would have uploaded %s to bucket %s', filename, s3_bucket_name)
+        else:
+            logging.info('Uploading %s to S3 Bucket %s', filename, s3_bucket_name)
+            bucket.upload_file(filename, filename,
+                ExtraArgs={
+                    'ACL': 'public-read',
+                    'ContentType': _get_content_type(filename),
+                    'Metadata': {'md5': _file_md5(filename)}
+                }
+            )
+
 
     if to_delete:
         objects_to_delete = [{'Key': filename} for filename in to_delete]
-        bucket.delete_objects(Delete={'Objects': objects_to_delete})
-        logging.info('Removed %s from S3 Bucket %s', ','.join(to_delete), s3_bucket_name)
+
+        if preview:
+            logging.info('Would have removed %s from S3 Bucket %s', ','.join(to_delete), s3_bucket_name)
+        else:
+            logging.info('Removing %s from S3 Bucket %s', ','.join(to_delete), s3_bucket_name)
+            bucket.delete_objects(Delete={'Objects': objects_to_delete})
