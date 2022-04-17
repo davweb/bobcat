@@ -275,6 +275,9 @@ def main():
             session.commit()
             logging.info('Found %d new episodes', new_episode_count)
 
+            # Clean up Selenium now to free memory in the container
+            bbc_sounds.clean_up()
+
         episodes = query.filter().order_by(Episode.published_utc.desc()).limit(max_episodes).all()
         download_episodes(episodes)
 

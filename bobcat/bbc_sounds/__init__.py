@@ -39,7 +39,7 @@ def _get_driver():
         if foreground:
             chrome_options.add_experimental_option('detach', True)
         else:
-            # Run headless 
+            # Run headless
             chrome_options.add_argument('--headless')
 
             # these options improve performance in a container
@@ -50,7 +50,7 @@ def _get_driver():
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--disable-dev-shm-usage')
 
-            atexit.register(clean_up_selenium)
+            atexit.register(clean_up)
 
         if _USE_DEFAULT_CHROMEDRIVER:
             service = Service(_DEFAULT_CHROMEDRIVER_PATH)
@@ -66,9 +66,14 @@ def _get_driver():
     return _DRIVER
 
 
-def clean_up_selenium():
+def clean_up():
     """Tidy up Selenium resources"""
-    _DRIVER.quit()
+
+    global _DRIVER
+
+    if _DRIVER is not None:
+        _DRIVER.quit()
+        _DRIVER = None
 
 
 def _bbc_login():
