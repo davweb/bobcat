@@ -17,7 +17,7 @@ then
     exit 3
 fi
 
-# Run now 
+# Run now
 /app/run.sh
 
 # Start cron in foreground for scheduled runs

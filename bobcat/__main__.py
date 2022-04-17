@@ -220,21 +220,28 @@ def main():
 
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
-    parser.add_argument('-e', '--no-episode-refresh', action='store_true', help='Generate feed using only cached episode data')
-    parser.add_argument('-u', '--no-upload', action='store_true', help='Preview S3 changes without actually making them')
+    parser.add_argument('-e', '--no-episode-refresh', action='store_true',
+        help='Generate feed using only cached episode data')
+    parser.add_argument('-u', '--no-upload', action='store_true',
+        help='Preview S3 changes without actually making them')
     parser.add_argument('-m', '--max-episodes', type=int, help='Maximum number of episodes')
     parser.add_argument('-l', '--logfile', type=Path)
     args = parser.parse_args()
     output_dir = args.output_dir
     cache_only = args.no_episode_refresh
     preview_mode = args.no_upload
-    max_episodes = args.max_episodes
     logfile = args.logfile
 
     configure_logging(logfile)
     logging.info('Starting')
-    logging.debug('Max episodes: %d', max_episodes)
-    logging.debug('Output directory: %s', output_dir)
+    logging.debug('Output directory is %s', output_dir)
+
+    try:
+        max_episodes = int(os.environ['EPISODE_LIMIT'])
+        logging.debug('Episodes limit is %d', max_episodes)
+    except (KeyError, ValueError):
+        max_episodes = 20
+        logging.info('Defaulting episode limit to %d', max_episodes)
 
     if cache_only:
         logging.info('Generating feed using only cached data')
