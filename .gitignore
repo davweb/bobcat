@@ -132,3 +132,7 @@ dmypy.json
 bin
 /run_bobcat.sh
 /.vscode
+/container-data
+/todo.txt
+/run_container.sh
+/bobcat.tar
