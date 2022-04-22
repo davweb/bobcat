@@ -115,7 +115,7 @@ def download_episode_image(episode):
     if episode.is_image_downloaded():
         logging.debug('Image for episode %s already downloaded', episode.episode_id)
     else:
-        logging.info('Downloading image for episode %s', episode.episode_id)
+        logging.info('Downloading image for episode %s - "%s"', episode.episode_id, episode.title)
         download.download_file(episode.image_url, episode.image_filename)
 
 
@@ -125,7 +125,7 @@ def download_episode_audio(episode):
     if episode.is_audio_downloaded():
         logging.debug('Audio for episode %s already downloaded', episode.episode_id)
     else:
-        logging.info('Downloading audio for episode %s', episode.episode_id)
+        logging.info('Downloading audio for episode %s - "%s"', episode.episode_id, episode.title)
         download.download_streaming_audio(episode.url, episode.audio_filename)
 
 
@@ -136,7 +136,7 @@ def convert_episode_audio(episode):
         logging.debug('Audio for episode %s already converted', episode.episode_id)
         return
 
-    logging.info('Coverting audio for episode %s', episode.episode_id)
+    logging.info('Coverting audio for episode %s - "%s"', episode.episode_id, episode.title)
     audio.convert_to_mp3(episode.audio_filename, episode.output_filename, episode.image_filename, episode.title)
 
 
@@ -292,7 +292,7 @@ def main():
         create_rss_feed(episodes, podcast_path)
         upload_podcast(episodes, preview_mode)
 
-    logging.info('Finished')
+    logging.info('Finished. Podcast feed available at %s/%s', podcast_path, RSS_FILE)
 
 if __name__ == '__main__':
     main()
