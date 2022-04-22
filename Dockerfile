@@ -1,10 +1,11 @@
-FROM alpine:3.15.2 as base
+# Use edge to get latest Chromium and ffmpeg
+FROM alpine:edge as base
 
 # Use a builder image for compiling dependencies
 FROM base as builder
 
 # Install python and the dependencies we need to build the python dependencies
-RUN apk add --no-cache python3 gcc musl-dev libffi-dev python3-dev 
+RUN apk add --no-cache python3 gcc musl-dev libffi-dev python3-dev
 # Build a virtual env to build the python dependencies in to
 RUN python3 -m venv /app/venv
 # Install python dependenices into temporary build image
