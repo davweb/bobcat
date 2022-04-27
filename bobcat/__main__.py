@@ -215,6 +215,14 @@ def configure_logging(logfile):
         datefmt='[%Y-%m-%dT%H:%M:%S%z]',
         level=log_level)
 
+    # Hide library logs
+    logging.getLogger('boto3').setLevel(logging.WARNING)
+    logging.getLogger('botocore').setLevel(logging.WARNING)
+    logging.getLogger('s3transfer').setLevel(logging.WARNING)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('selenium.webdriver.remote.remote_connection').setLevel(logging.WARNING)
+
+
 def main():
     """Main"""
 

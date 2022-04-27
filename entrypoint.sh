@@ -34,4 +34,4 @@ info `ffmpeg -version | head -1`
 /app/run.sh
 
 # Start cron in foreground for scheduled runs
-exec crond -f -l 8
+exec crond -f -l 9
