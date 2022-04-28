@@ -1,8 +1,12 @@
+"""Database models"""
+
+import logging
 import os
 from pathlib import Path
 from datetime import timezone
 from sqlalchemy import Column, String, DateTime
 from bobcat import audio
+from bobcat import bbc_sounds
 from bobcat.database import Base
 
 
@@ -85,4 +89,3 @@ class Episode(Base):
             self.image_url = metadata['image_url']
             self.published_utc = metadata['availability_from']
             logging.debug('Read metadata for episode %s from website', self.episode_id)
-

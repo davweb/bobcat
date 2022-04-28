@@ -66,7 +66,7 @@ def convert_to_mp3(input_filename, output_filename, cover_art, title):
     command += ['-codec:v', 'mjpeg']
 
     # metadata
-    command += ['-metadata', 'title={0}'.format(title)]
+    command += ['-metadata', f'title={title}']
 
     # disable writing encoding information as some decoders incorrectly infer VBR if it is there
     command += ['-write_xing', '0']
@@ -82,14 +82,11 @@ def convert_to_mp3(input_filename, output_filename, cover_art, title):
 
     logging.debug('Running command: %s', format(subprocess.list2cmdline(command)))
 
-    process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    with subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as process:
+        for output_line in iter(process.stdout.readline, ""):
+            logging.debug('Output: %s', output_line.strip())
 
-    for output_line in iter(process.stdout.readline, ""):
-        logging.debug('Output: %s', output_line.strip())
-
-    process.stdout.close()
-    exit_code = process.wait()
-
+    exit_code = process.returncode
     logging.debug('Command completed with exit code: %d', exit_code)
 
     if exit_code:

@@ -1,3 +1,5 @@
+"""Manage database via SQLAchemy"""
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -23,8 +25,6 @@ def _initialise_database():
 
 def make_session():
     """Return an SQLAchmemy session"""
-
-    global _SESSION_MAKER
 
     if _SESSION_MAKER is None:
         _initialise_database()
