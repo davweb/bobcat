@@ -5,16 +5,13 @@ import os
 import logging
 import shutil
 from pathlib import Path
-from feedgen.feed import FeedGenerator
 from bobcat import audio
 from bobcat import bbc_sounds
 from bobcat import database
 from bobcat import download
+from bobcat import feed
 from bobcat import s3sync
 from bobcat.models import Episode
-
-RSS_FILE = 'podcast.xml'
-LOGO_FILE = 'logo.png'
 
 
 def download_episodes(episodes):
@@ -57,58 +54,10 @@ def convert_episode_audio(episode):
     audio.convert_to_mp3(episode.audio_filename, episode.output_filename, episode.image_filename, episode.title)
 
 
-def create_rss_feed(episodes, podcast_path):
-    """Create the RSS file for the episodes"""
-    logo_url = f'{podcast_path}/{LOGO_FILE}'
-
-    episodes = [episode for episode in episodes if episode.is_audio_downloaded()]
-    publication_date = max(episode.published() for episode in episodes)
-
-    feed_generator = FeedGenerator()
-    feed_generator.load_extension('podcast')
-
-    feed_generator.title('BBC Sounds Subscriptions')
-    feed_generator.description('Episodes of shows I have subscribed to on BBC Sounds')
-    feed_generator.author({'name': 'BBC Sounds', 'email': 'RadioMusic.Support@bbc.co.uk'})
-    feed_generator.logo(logo_url)
-    feed_generator.link(href=f'{podcast_path}/{RSS_FILE}', rel='self')
-    feed_generator.language('en')
-    feed_generator.pubDate(publication_date)
-    feed_generator.lastBuildDate(publication_date)
-
-    feed_generator.podcast.itunes_category('Arts')
-    feed_generator.podcast.itunes_category('Comedy')
-    feed_generator.podcast.itunes_category('Music')
-    feed_generator.podcast.itunes_category('News')
-    feed_generator.podcast.itunes_category('Sports')
-    feed_generator.podcast.itunes_author('BBC Sounds')
-    feed_generator.podcast.itunes_block(True)
-    feed_generator.podcast.itunes_explicit('no')
-    feed_generator.podcast.itunes_image(logo_url)
-    feed_generator.podcast.itunes_owner(name='BBC', email='RadioMusic.Support@bbc.co.uk')
-
-    for episode in episodes:
-        audio_url = f'{podcast_path}/{episode.output_filename}'
-        image_url = f'{podcast_path}/{episode.image_filename}'
-
-        feed_entry = feed_generator.add_entry()
-        feed_entry.id(audio_url)
-        feed_entry.title(episode.title)
-        feed_entry.description(episode.description)
-        feed_entry.enclosure(url=audio_url, length=str(episode.size_in_bytes()), type='audio/mpeg')
-        feed_entry.published(episode.published())
-        feed_entry.link(href=episode.url)
-        feed_entry.podcast.itunes_duration(episode.duration_in_seconds())
-        feed_entry.podcast.itunes_image(image_url)
-        feed_entry.podcast.itunes_author('BBC Sounds')
-
-    feed_generator.rss_file(RSS_FILE, pretty=True)
-
-
 def upload_podcast(episodes, preview_mode):
     """Upload the podcast by syncing with an S3 bucket"""
 
-    files_in_feed = set([RSS_FILE, LOGO_FILE])
+    files_in_feed = set([feed.RSS_FILE, feed.LOGO_FILE])
 
     for episode in episodes:
         files_in_feed.add(episode.output_filename)
@@ -140,8 +89,9 @@ def configure_logging(logfile):
     logging.getLogger('selenium.webdriver.remote.remote_connection').setLevel(logging.WARNING)
 
 
-def main():
-    """Main"""
+
+def process_configuration():
+    """Configuration from command line arguments and environment variables"""
 
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
@@ -158,7 +108,7 @@ def main():
     logfile = args.logfile
 
     configure_logging(logfile)
-    logging.info('Starting')
+    logging.debug('Starting')
     logging.debug('Output directory is %s', output_dir)
 
     try:
@@ -174,8 +124,16 @@ def main():
     if preview_mode:
         logging.info('Showing changes to S3 but not making them')
 
+    return (output_dir, cache_only, preview_mode, max_episodes)
+
+
+def main():
+    """Main"""
+
+    (output_dir, cache_only, preview_mode, max_episodes) = process_configuration()
+
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    shutil.copy2(LOGO_FILE, output_dir)
+    shutil.copy2(feed.LOGO_FILE, output_dir)
     os.chdir(output_dir)
 
     with database.make_session() as session:
@@ -210,10 +168,10 @@ def main():
         download_episodes(episodes)
 
         podcast_path = s3sync.bucket_url()
-        create_rss_feed(episodes, podcast_path)
+        feed.create_rss_feed(episodes, podcast_path)
         upload_podcast(episodes, preview_mode)
 
-    logging.info('Finished. Podcast feed available at %s/%s', podcast_path, RSS_FILE)
+    logging.info('Finished. Podcast feed available at %s/%s', podcast_path, feed.RSS_FILE)
 
 if __name__ == '__main__':
     main()
