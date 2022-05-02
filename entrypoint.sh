@@ -1,7 +1,10 @@
 #!/bin/sh
 
-info() {
-  echo `date +"[%Y-%m-%dT%H:%M:%S%z]"` INFO $*
+debug() {
+  if [ "${LOG_LEVEL}" == "DEBUG" ]
+  then
+    echo `date +"[%Y-%m-%dT%H:%M:%S%z]"` DEBUG $*
+  fi
 }
 
 error() {
@@ -21,14 +24,14 @@ done
 
 if [ -n "${MISSING_VARIABLE}" ]
 then
-    info Missing configuration, exiting.
-    exit 3
+  error Missing configuration, exiting.
+  exit 3
 fi
 
 # Show dependency versions
-info `python --version`
-info `chromium-browser --version`
-info `ffmpeg -version | head -1`
+debug `python --version`
+debug `chromium-browser --version`
+debug `ffmpeg -version | head -1`
 
 # Run now
 /app/run.sh
