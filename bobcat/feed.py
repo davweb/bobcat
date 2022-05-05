@@ -8,9 +8,7 @@ LOGO_FILE = 'logo.png'
 def create_rss_feed(episodes, podcast_path):
     """Create the RSS file for the episodes"""
     logo_url = f'{podcast_path}/{LOGO_FILE}'
-
-    episodes = [episode for episode in episodes if episode.is_audio_downloaded()]
-    publication_date = max(episode.published() for episode in episodes)
+    publication_date = max(episode.published for episode in episodes)
 
     feed_generator = FeedGenerator()
     feed_generator.load_extension('podcast')
@@ -43,10 +41,10 @@ def create_rss_feed(episodes, podcast_path):
         feed_entry.id(audio_url)
         feed_entry.title(episode.title)
         feed_entry.description(episode.description)
-        feed_entry.enclosure(url=audio_url, length=str(episode.size_in_bytes()), type='audio/mpeg')
-        feed_entry.published(episode.published())
+        feed_entry.enclosure(url=audio_url, length=str(episode.size_in_bytes), type='audio/mpeg')
+        feed_entry.published(episode.published)
         feed_entry.link(href=episode.url)
-        feed_entry.podcast.itunes_duration(episode.duration_in_seconds())
+        feed_entry.podcast.itunes_duration(episode.duration_in_seconds)
         feed_entry.podcast.itunes_image(image_url)
         feed_entry.podcast.itunes_author('BBC Sounds')
 

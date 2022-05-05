@@ -14,10 +14,7 @@ def _initialise_database():
     global _SESSION_MAKER
 
     # We need to make sure all models have been imported at least one before
-    # creating the DB so we have all the metadata. Do it here to avoid a
-    # circular import
-    from bobcat.models import Episode
-
+    # creating the DB so we have all the metadata.
     engine = create_engine('sqlite:///bobcat.db', echo=False)
     _SESSION_MAKER = sessionmaker(engine)
     Base.metadata.create_all(engine)

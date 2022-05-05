@@ -1,25 +1,8 @@
 """Sync local files with Amazon S3"""
 
 import os
-from functools import cache
-import hashlib
 import logging
 import boto3
-
-@cache
-def _file_md5(filename):
-    """Calculate an MD5 hash of a file
-
-    This calcates the MD5 hash of a file in the current working directory.
-    Hashes are cached as they won't change during the runtime of the script.
-    """
-
-    with open(filename, 'rb') as file:
-        file_hash = hashlib.md5()
-        while chunk := file.read(8192):
-            file_hash.update(chunk)
-
-    return file_hash.hexdigest()
 
 
 def _get_content_type(filename):
@@ -45,67 +28,63 @@ def _get_content_type(filename):
     raise ValueError(f'Could not determine content type for file "{filename}"')
 
 
+def _bucket_name():
+    """Return S3 bucket name"""
+
+    return os.environ['S3_BUCKET_NAME']
+
+
 def bucket_url():
     """Return URL for accessing S3 bucket"""
 
-    s3_bucket_name = os.environ['S3_BUCKET_NAME']
+    s3_bucket_name = _bucket_name()
     return f'https://{s3_bucket_name}.s3.amazonaws.com'
 
 
-def files_with_bucket(files_to_sync, preview):
-    """Sync list of files with an s3 bucket
-
-    This syncs a list of filenames which should be files in the current working
-    directory with the named S3 bucket.  Missing files are uploaded and unlisted
-    files in the bucket are deleted.  An 'md5' custom metadata attribute is
-    added on upload to determine if files existing in the bucket have changed.
-    """
+def _get_bucket_client():
+    """Return a client for accessing an S3 Bucket"""
 
     aws_access_id = os.environ['AWS_ACCESS_ID']
     aws_secret_key = os.environ['AWS_SECRET_KEY']
-    s3_bucket_name = os.environ['S3_BUCKET_NAME']
+    s3_bucket_name = _bucket_name()
 
     s3_client = boto3.resource('s3', aws_access_key_id=aws_access_id, aws_secret_access_key=aws_secret_key)
-    bucket = s3_client.Bucket(s3_bucket_name)
-    uploaded = set(object.key for object in bucket.objects.all())
-
-    to_upload = files_to_sync - uploaded
-    to_delete = uploaded - files_to_sync
-    to_check = files_to_sync & uploaded
-
-    # Check if existing files need to be overwritten by comparing local MD5 with
-    # that stored as custom metadata on the S3 object
-    for filename in to_check:
-        remote_file = s3_client.Object(s3_bucket_name, filename)
-        remote_md5 = remote_file.metadata.get('md5')
-        local_md5 = _file_md5(filename)
-
-        if remote_md5 == local_md5:
-            logging.debug('Skipping %s as unmodified since last upload', filename)
-        else:
-            to_upload.add(filename)
-
-    logging.info('Uploading %d files to S3 Bucket %s', len(to_upload), s3_bucket_name)
-
-    for filename in to_upload:
-        if preview:
-            logging.info('Would have uploaded %s to bucket %s', filename, s3_bucket_name)
-        else:
-            logging.info('Uploading %s to S3 Bucket %s', filename, s3_bucket_name)
-            bucket.upload_file(filename, filename,
-                ExtraArgs={
-                    'ACL': 'public-read',
-                    'ContentType': _get_content_type(filename),
-                    'Metadata': {'md5': _file_md5(filename)}
-                }
-            )
+    return s3_client.Bucket(s3_bucket_name)
 
 
-    if to_delete:
-        objects_to_delete = [{'Key': filename} for filename in to_delete]
+def get_bucket_contents():
+    """Return all the keys for an S3 Bucket"""
 
-        if preview:
-            logging.info('Would have removed %s from S3 Bucket %s', ','.join(to_delete), s3_bucket_name)
-        else:
-            logging.info('Removing %s from S3 Bucket %s', ','.join(to_delete), s3_bucket_name)
-            bucket.delete_objects(Delete={'Objects': objects_to_delete})
+    bucket = _get_bucket_client()
+    return set(object.key for object in bucket.objects.all())
+
+
+def upload_file(filename):
+    """Upload a file to the S3 Bucket"""
+
+    upload_files([filename])
+
+
+def upload_files(filenames):
+    """Upload files to the S3 Bucket"""
+
+    logging.info('Uploading %s to S3 Bucket %s', ','.join(filenames), _bucket_name())
+    bucket = _get_bucket_client()
+
+    for filename in filenames:
+        bucket.upload_file(filename, filename,
+            ExtraArgs={
+                'ACL': 'public-read',
+                'ContentType': _get_content_type(filename)
+            }
+        )
+
+
+def delete_files(filenames):
+    """Delete files from S3 bucket"""
+
+    logging.info('Removing %s from S3 Bucket %s', ','.join(filenames), _bucket_name())
+
+    bucket = _get_bucket_client()
+    objects_to_delete = [{'Key': filename} for filename in filenames]
+    bucket.delete_objects(Delete={'Objects': objects_to_delete})

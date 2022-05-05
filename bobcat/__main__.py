@@ -18,52 +18,50 @@ def download_episodes(episodes):
     """Download the assets for all episodes"""
 
     for episode in episodes:
-        download_episode_audio(episode)
-        download_episode_image(episode)
-        convert_episode_audio(episode)
+        download_episode(episode)
+
+
+def download_episode(episode):
+    """Download all the assets for the episode"""
+
+    download_episode_image(episode)
+    download_episode_audio(episode)
+    convert_episode_audio(episode)
+    episode.size_in_bytes = os.path.getsize(episode.output_filename)
+    episode.duration_in_seconds = audio.duration_in_seconds(episode.output_filename)
 
 
 def download_episode_image(episode):
     """Download the image files for each episode"""
 
-    if episode.is_image_downloaded():
+    if Path(episode.image_filename).exists():
         logging.debug('Image for episode %s already downloaded', episode.episode_id)
-    else:
-        logging.info('Downloading image for episode %s - "%s"', episode.episode_id, episode.title)
-        download.download_file(episode.image_url, episode.image_filename)
+        return
+
+    logging.info('Downloading image for episode %s - "%s"', episode.episode_id, episode.title)
+    download.download_file(episode.image_url, episode.image_filename)
 
 
 def download_episode_audio(episode):
     """Download audio files for each episode"""
 
-    if episode.is_audio_downloaded():
+    if Path(episode.audio_filename).exists():
         logging.debug('Audio for episode %s already downloaded', episode.episode_id)
-    else:
-        logging.info('Downloading audio for episode %s - "%s"', episode.episode_id, episode.title)
-        download.download_streaming_audio(episode.url, episode.audio_filename)
+        return
+
+    logging.info('Downloading audio for episode %s - "%s"', episode.episode_id, episode.title)
+    download.download_streaming_audio(episode.url, episode.audio_filename)
 
 
 def convert_episode_audio(episode):
     """Convert the dowloaded mp4 file to mp3 and add cover art"""
 
-    if episode.is_audio_converted():
+    if Path(episode.output_filename).exists():
         logging.debug('Audio for episode %s already converted', episode.episode_id)
         return
 
     logging.info('Coverting audio for episode %s - "%s"', episode.episode_id, episode.title)
     audio.convert_to_mp3(episode.audio_filename, episode.output_filename, episode.image_filename, episode.title)
-
-
-def upload_podcast(episodes, preview_mode):
-    """Upload the podcast by syncing with an S3 bucket"""
-
-    files_in_feed = set([feed.RSS_FILE, feed.LOGO_FILE])
-
-    for episode in episodes:
-        files_in_feed.add(episode.output_filename)
-        files_in_feed.add(episode.image_filename)
-
-    s3sync.files_with_bucket(files_in_feed, preview_mode)
 
 
 def configure_logging(logfile):
@@ -89,22 +87,17 @@ def configure_logging(logfile):
     logging.getLogger('selenium.webdriver.remote.remote_connection').setLevel(logging.WARNING)
 
 
-
 def process_configuration():
     """Configuration from command line arguments and environment variables"""
 
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
-    parser.add_argument('-e', '--no-episode-refresh', action='store_true',
+    parser.add_argument('-n', '--no-episode-refresh', action='store_true',
         help='Generate feed using only cached episode data')
-    parser.add_argument('-u', '--no-upload', action='store_true',
-        help='Preview S3 changes without actually making them')
-    parser.add_argument('-m', '--max-episodes', type=int, help='Maximum number of episodes')
     parser.add_argument('-l', '--logfile', type=Path)
     args = parser.parse_args()
     output_dir = args.output_dir
     cache_only = args.no_episode_refresh
-    preview_mode = args.no_upload
     logfile = args.logfile
 
     configure_logging(logfile)
@@ -121,57 +114,133 @@ def process_configuration():
     if cache_only:
         logging.info('Generating feed using only cached data')
 
-    if preview_mode:
-        logging.info('Showing changes to S3 but not making them')
+    return (output_dir, cache_only, max_episodes)
 
-    return (output_dir, cache_only, preview_mode, max_episodes)
+
+def load_episode_metadata(episode):
+    """Get metadata from website"""
+
+    metadata = bbc_sounds.get_episode_metadata(episode.url)
+    episode.title = metadata['title']
+    episode.description = metadata['synopsis']
+    episode.image_url = metadata['image_url']
+    episode.published_utc = metadata['availability_from']
+    logging.debug('Read metadata for episode %s from website', episode.episode_id)
+
+
+def update_episode_list(session, max_episodes):
+    """Update the Episode database from the BBC Website"""
+
+    logging.info('Fetching episode list')
+    episode_urls = bbc_sounds.get_episode_urls(max_episodes)
+    episodes = []
+    new_episode_count = 0
+    query = session.query(Episode)
+
+    for url in episode_urls:
+        episode = query.filter(Episode.url == url).one_or_none()
+
+        if episode is None:
+            new_episode_count += 1
+            episode = Episode(url)
+            session.add(episode)
+
+        episodes.append(episode)
+
+    for episode in episodes:
+        if episode.title is None or episode.description is None or episode.image_url is None:
+            load_episode_metadata(episode)
+
+    session.commit()
+    logging.info('Found %d new episodes', new_episode_count)
+
+    # Clean up Selenium now to free memory in the container
+    bbc_sounds.clean_up()
+
+
+def sync_episodes(session, max_episodes):
+    """Download episode audio and upload it to S3"""
+
+    bucket_contents = s3sync.get_bucket_contents()
+
+    # handle logo - ignore it if it's there, upload it if it's not
+    if feed.LOGO_FILE in bucket_contents:
+        bucket_contents.remove(feed.LOGO_FILE)
+    else:
+        s3sync.upload_file(feed.LOGO_FILE)
+
+    # Ignore feed file for now
+    bucket_contents.remove(feed.RSS_FILE)
+
+    query = session.query(Episode)
+    episodes = query.filter().order_by(Episode.published_utc.desc()).limit(max_episodes).all()
+    uploaded_episodes = []
+    change = False
+
+    for episode in episodes:
+        episode_files = set([episode.output_filename, episode.image_filename])
+        episode_uploaded = episode_files.issubset(bucket_contents)
+        bucket_contents -= episode_files
+
+        if episode_uploaded:
+            logging.debug('Episode %s already in S3 Bucket', episode.episode_id)
+            uploaded_episodes.append(episode)
+            continue
+
+        try:
+            download_episode(episode)
+            s3sync.upload_files(episode_files)
+        except Exception as exception:
+            logging.warning('Failed to sync episode %s - "%s"', episode.episode_id, episode.title, exc_info=exception)
+            continue
+
+        uploaded_episodes.append(episode)
+
+        try:
+            for filename in episode_files:
+                os.remove(filename)
+                logging.debug('Deleted %s', filename)
+        except Exception as exception:
+            logging.warning('Failed to delete files for episode %s - "%s"',
+                episode.episode_id, episode.title, exc_info=exception)
+
+
+    # Delete old files in the S3 bucket
+    if bucket_contents:
+        change = True
+
+        try:
+            s3sync.delete_files(bucket_contents)
+        except Exception as exception:
+            logging.warning('Failed to tidy S3 bucket', exc_info=exception)
+
+    return uploaded_episodes, change
 
 
 def main():
     """Main"""
 
-    (output_dir, cache_only, preview_mode, max_episodes) = process_configuration()
+    (output_dir, cache_only, max_episodes) = process_configuration()
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     shutil.copy2(feed.LOGO_FILE, output_dir)
     os.chdir(output_dir)
 
     with database.make_session() as session:
-        query = session.query(Episode)
 
         if not cache_only:
-            logging.info('Fetching episode list')
-            episode_urls = bbc_sounds.get_episode_urls(max_episodes)
-            episodes = []
-            new_episode_count = 0
+            update_episode_list(session, max_episodes)
 
-            for url in episode_urls:
-                episode = query.filter(Episode.url == url).one_or_none()
+        episodes, change = sync_episodes(session, max_episodes)
 
-                if episode is None:
-                    new_episode_count += 1
-                    episode = Episode(url)
-                    session.add(episode)
+        if change:
+            podcast_path = s3sync.bucket_url()
+            feed.create_rss_feed(episodes, podcast_path)
+            s3sync.upload_file(feed.RSS_FILE)
+            logging.info('Finished. Podcast feed available at %s/%s', podcast_path, feed.RSS_FILE)
+        else:
+            logging.info('Finished with no changes')
 
-                episodes.append(episode)
-
-            for episode in episodes:
-                episode.load_metadata()
-
-            session.commit()
-            logging.info('Found %d new episodes', new_episode_count)
-
-            # Clean up Selenium now to free memory in the container
-            bbc_sounds.clean_up()
-
-        episodes = query.filter().order_by(Episode.published_utc.desc()).limit(max_episodes).all()
-        download_episodes(episodes)
-
-        podcast_path = s3sync.bucket_url()
-        feed.create_rss_feed(episodes, podcast_path)
-        upload_podcast(episodes, preview_mode)
-
-    logging.info('Finished. Podcast feed available at %s/%s', podcast_path, feed.RSS_FILE)
 
 if __name__ == '__main__':
     main()
