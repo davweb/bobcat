@@ -4,7 +4,9 @@ import argparse
 import os
 import logging
 import shutil
+import sys
 from pathlib import Path
+from botocore.exceptions import ClientError
 from bobcat import audio
 from bobcat import bbc_sounds
 from bobcat import database
@@ -162,10 +164,33 @@ def update_episode_list(session, max_episodes):
     bbc_sounds.clean_up()
 
 
+def get_bucket_contents():
+    """Get S3 Bucket contents, exiting with error on failure"""
+
+    try:
+        return s3sync.get_bucket_contents()
+    except ClientError as client_error:
+        error = client_error.response.get('Error', {}).get('Code', None)
+
+        if error == 'SignatureDoesNotMatch':
+            logging.error('AWS Authorization failure. Are the AWS credentials correct?')
+        elif error == 'AccessDenied':
+            logging.error('Access denied to S3 bucket. Does the account have the correct permissions?')
+        elif error is not None:
+            logging.error('Failed to query S3 bucket due to %s error.', error)
+        else:
+            logging.error('Failed to query S3 bucket.', exc_info=client_error)
+
+        sys.exit(1)
+    except Exception as exception:
+        logging.error('Failed to query S3 bucket.', exc_info=exception)
+        sys.exit(1)
+
+
 def sync_episodes(session, max_episodes):
     """Download episode audio and upload it to S3"""
 
-    bucket_contents = s3sync.get_bucket_contents()
+    bucket_contents = get_bucket_contents()
 
     # handle logo - ignore it if it's there, upload it if it's not
     if feed.LOGO_FILE in bucket_contents:
