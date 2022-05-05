@@ -177,6 +177,8 @@ def get_bucket_contents():
             logging.error('AWS Authorization failure. Are the AWS credentials correct?')
         elif error == 'AccessDenied':
             logging.error('Access denied to S3 bucket. Does the account have the correct permissions?')
+        elif error == 'NoSuchBucket':
+            logging.error('Unknown S3 bucket. Is the bucket name correct?')
         elif error is not None:
             logging.error('Failed to query S3 bucket due to %s error.', error)
         else:
