@@ -3,6 +3,7 @@
 import atexit
 import logging
 import os
+import sys
 from pathlib import Path
 from dateutil import parser
 from selenium import webdriver
@@ -89,6 +90,10 @@ def _bbc_login():
     password_field.send_keys(bbc_password)
     submit_button = driver.find_element(By.ID, 'submit-button')
     submit_button.click()
+
+    if driver.current_url.startswith(_URL_BBC_LOGIN):
+        logging.error("BBC login failed. Are the credentials correct?")
+        sys.exit(1)
 
 
 def _accept_cookie_prompt():
