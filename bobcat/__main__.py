@@ -80,11 +80,15 @@ def configure_logging(logfile):
         level=log_level)
 
     # Hide library logs
-    logging.getLogger('boto3').setLevel(logging.WARNING)
-    logging.getLogger('botocore').setLevel(logging.WARNING)
-    logging.getLogger('s3transfer').setLevel(logging.WARNING)
-    logging.getLogger('urllib3').setLevel(logging.WARNING)
-    logging.getLogger('selenium.webdriver.remote.remote_connection').setLevel(logging.WARNING)
+    library_log_level_name = os.environ.get('LIBRARY_LOG_LEVEL', 'CRITICAL')
+    library_log_level = logging.getLevelName(library_log_level_name)
+
+    logging.getLogger('boto3').setLevel(library_log_level)
+    logging.getLogger('botocore').setLevel(library_log_level)
+    logging.getLogger('s3transfer').setLevel(library_log_level)
+    logging.getLogger('urllib3').setLevel(library_log_level)
+    logging.getLogger('selenium.webdriver.remote.remote_connection').setLevel(library_log_level)
+    logging.getLogger('youtube-dl').setLevel(library_log_level)
 
 
 def process_configuration():

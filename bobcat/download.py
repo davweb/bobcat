@@ -20,10 +20,12 @@ def download_file(url, output_filename):
 def download_streaming_audio(url, output_filename):
     """Download streaming audio from a page to an m4a file"""
 
+    logger = logging.getLogger('youtube-dl')
+
     ydl_options = {
         'outtmpl': output_filename,
         'format': 'bestaudio[ext=m4a]',
-        'logger': logging,
+        'logger': logger,
         'noprogress': True
     }
 
