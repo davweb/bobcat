@@ -12,6 +12,7 @@ from bobcat import bbc_sounds
 from bobcat import database
 from bobcat import download
 from bobcat import feed
+from bobcat import overcast
 from bobcat import s3sync
 from bobcat.models import Episode
 
@@ -191,12 +192,14 @@ def sync_episodes(session, max_episodes):
     """Download episode audio and upload it to S3"""
 
     bucket_contents = get_bucket_contents()
+    change = False
 
     # handle logo - ignore it if it's there, upload it if it's not
     if feed.LOGO_FILE in bucket_contents:
         bucket_contents.remove(feed.LOGO_FILE)
     else:
         s3sync.upload_file(feed.LOGO_FILE)
+        change = True
 
     # Ignore feed file for now
     bucket_contents.remove(feed.RSS_FILE)
@@ -204,7 +207,6 @@ def sync_episodes(session, max_episodes):
     query = session.query(Episode)
     episodes = query.filter().order_by(Episode.published_utc.desc()).limit(max_episodes).all()
     uploaded_episodes = []
-    change = False
 
     for episode in episodes:
         episode_files = set([episode.output_filename, episode.image_filename])
@@ -224,6 +226,7 @@ def sync_episodes(session, max_episodes):
             continue
 
         uploaded_episodes.append(episode)
+        change = True
 
         try:
             for filename in episode_files:
@@ -232,7 +235,6 @@ def sync_episodes(session, max_episodes):
         except Exception as exception:
             logging.warning('Failed to delete files for episode %s - "%s"',
                 episode.episode_id, episode.title, exc_info=exception)
-
 
     # Delete old files in the S3 bucket
     if bucket_contents:
@@ -266,7 +268,9 @@ def main():
             podcast_path = s3sync.bucket_url()
             feed.create_rss_feed(episodes, podcast_path)
             s3sync.upload_file(feed.RSS_FILE)
-            logging.info('Finished. Podcast feed available at %s/%s', podcast_path, feed.RSS_FILE)
+            podcast_url = f'{podcast_path}/{feed.RSS_FILE}'
+            overcast.ping(podcast_url)
+            logging.info('Finished. Podcast feed available at %s', podcast_url)
         else:
             logging.info('Finished with no changes')
 
