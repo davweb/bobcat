@@ -222,6 +222,7 @@ def sync_episodes(session, max_episodes):
 
         try:
             download_episode(episode)
+            session.commit()
             s3sync.upload_files(episode_files)
         except Exception as exception:
             logging.warning('Failed to sync episode %s - "%s"', episode.episode_id, episode.title, exc_info=exception)
