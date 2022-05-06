@@ -1,5 +1,5 @@
 # bobcat
-Create a Podcast feed from BBC Sounds subscriptions.
+Bobcat allows you to ceate a podcast feed from your BBC Sounds subscriptions.
 
 Bobcat runs in a Docker container and uploads podcast files to an Amazon S3 Bucket.
 
@@ -7,7 +7,7 @@ Here is how the feel looks in Apple Podcasts and Overcast.
 
 ![Apple Podcasts](apple_podcasts.png) ![Overcast](overcast.png)
 
-## How it works
+## How it works
 The podcast feed is created as follows:
 
 * A headless Chrome browser is launched.
@@ -23,7 +23,7 @@ The feed will contain the most recent episodes found across all shows. As Bobcat
 
 The feed contains an `<itunes:block>` element and so should be treated as a private feed by Podcast players.
 
-## Amazon S3 Bucket
+## Amazon S3 Bucket
 
 Bobcat tidies the S3 bucket it uses, removing any files that are no longer part of the podcast feels.  This means the bucket used by Bobcat should not be used for any other purpose as **any unregonised files will be permanently deleted**.
 
