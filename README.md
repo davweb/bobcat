@@ -3,7 +3,7 @@ Bobcat allows you to ceate a podcast feed from your BBC Sounds subscriptions.
 
 Bobcat runs in a Docker container and uploads podcast files to an Amazon S3 Bucket.
 
-Here is how the feel looks in Apple Podcasts and Overcast.
+Here is how the feed looks in Apple Podcasts and Overcast.
 
 ![Apple Podcasts](apple_podcasts.png) ![Overcast](overcast.png)
 
