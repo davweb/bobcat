@@ -14,8 +14,7 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.load_extension('podcast')
 
     feed_generator.title('BBC Sounds Subscriptions')
-    feed_generator.description('Episodes of shows I have subscribed to on BBC Sounds')
-    feed_generator.author({'name': 'Bobcat'})
+    feed_generator.description('Episodes of shows subscribed to on BBC Sounds')
     feed_generator.logo(logo_url)
     feed_generator.link(href=f'{podcast_path}/{RSS_FILE}', rel='self')
     feed_generator.language('en')
@@ -31,7 +30,6 @@ def create_rss_feed(episodes, podcast_path):
     feed_generator.podcast.itunes_block(True)
     feed_generator.podcast.itunes_explicit('no')
     feed_generator.podcast.itunes_image(logo_url)
-    feed_generator.podcast.itunes_owner(name='BBC', email='RadioMusic.Support@bbc.co.uk')
 
     for episode in episodes:
         audio_url = f'{podcast_path}/{episode.output_filename}'
