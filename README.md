@@ -50,7 +50,7 @@ The Environment Varitables used by the Docker container are as follows:
 | `AWS_ACCESS_ID` | The access ID of an AWS account with bucket permissions | :white_check_mark: | |
 | `AWS_SECRET_KEY` | The secret key for the AWS account  | :white_check_mark: | |
 | `S3_BUCKET_NAME` | The name of the S3 Bucket used to host the podcast  | :white_check_mark: | |
-| `EPISODE_LIMIT` | The maximum number of episodes in the fedd | | 20 |
+| `EPISODE_LIMIT` | The maximum number of episodes in the feed | | 20 |
 | `LOG_LEVEL` | The log level; one of `DEBUG`, `INFO`, `WARNING` or `CRITICAL` | | `INFO` |
 | `LIBRARY_LOG_LEVEL` | The log level for third party code; one of `DEBUG`, `INFO`, `WARNING` or `CRITICAL` | | `CRITICAL` |
 | `OVERCAST` | Set to any non-blank value to ping Overcast servers when podcast is updated | | |
