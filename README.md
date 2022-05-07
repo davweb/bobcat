@@ -59,7 +59,8 @@ The significant volumes in the Docker container are as follows:
 
 | Volume | Description |
 | ------ | ------ |
-| `/bobcat` | This is where the Bobcat SQLite database is stored which contains episode information.  If the database is lost it is easily re-created from the BBC Sounds website so it's not necessary to make the volume persistent. |
+| `/bobcat` | This is where the Bobcat SQLite database is stored which contains episode information.  If the database is lost it can be re-created from the BBC Sounds website but it's better to make the volume persistent if possible. |
+| `/tmp` | This is where bobcat downloads and converts files. |
 
 ## Logo
 

@@ -1,4 +1,5 @@
 #!/bin/sh
 
 cd /app
-python -m bobcat -o /bobcat
+export DATABASE_DIRECTORY=/bobcat
+python -m bobcat -o /tmp

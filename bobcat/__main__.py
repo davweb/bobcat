@@ -94,6 +94,16 @@ def configure_logging(logfile):
     logging.getLogger('youtube-dl').setLevel(library_log_level)
 
 
+def initialise_output_directory(output_dir):
+    """Initialise the working directory"""
+
+    logging.debug('Output directory is %s', output_dir)
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    shutil.copy2(feed.LOGO_FILE, output_dir)
+    os.chdir(output_dir)
+
+
 def process_configuration():
     """Configuration from command line arguments and environment variables"""
 
@@ -109,7 +119,7 @@ def process_configuration():
 
     configure_logging(logfile)
     logging.debug('Starting')
-    logging.debug('Output directory is %s', output_dir)
+    initialise_output_directory(output_dir)
 
     try:
         max_episodes = int(os.environ['EPISODE_LIMIT'])
@@ -121,7 +131,7 @@ def process_configuration():
     if cache_only:
         logging.info('Generating feed using only cached data')
 
-    return (output_dir, cache_only, max_episodes)
+    return (cache_only, max_episodes)
 
 
 def load_episode_metadata(episode):
@@ -254,11 +264,7 @@ def sync_episodes(session, max_episodes):
 def main():
     """Main"""
 
-    (output_dir, cache_only, max_episodes) = process_configuration()
-
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    shutil.copy2(feed.LOGO_FILE, output_dir)
-    os.chdir(output_dir)
+    (cache_only, max_episodes) = process_configuration()
 
     with database.make_session() as session:
 

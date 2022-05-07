@@ -92,7 +92,7 @@ def _bbc_login():
     submit_button.click()
 
     if driver.current_url.startswith(_URL_BBC_LOGIN):
-        logging.error("BBC login failed. Are the credentials correct?")
+        logging.error('BBC login failed. Are the credentials correct?')
         sys.exit(1)
 
 
