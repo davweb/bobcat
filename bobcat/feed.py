@@ -5,6 +5,7 @@ from feedgen.feed import FeedGenerator
 RSS_FILE = 'podcast.xml'
 LOGO_FILE = 'logo.png'
 
+
 def create_rss_feed(episodes, podcast_path):
     """Create the RSS file for the episodes"""
     logo_url = f'{podcast_path}/{LOGO_FILE}'

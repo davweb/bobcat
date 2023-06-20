@@ -6,6 +6,7 @@ import requests
 
 _OVERCAST_URL = 'https://overcast.fm/ping?urlprefix={}'
 
+
 def ping(feed_url):
     """Ping Overcast with feed Url"""
 

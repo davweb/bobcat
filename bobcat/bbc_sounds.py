@@ -17,7 +17,7 @@ _URL_BBC_SOUNDS = 'https://www.bbc.co.uk/sounds'
 _URL_BBC_MY_SOUNDS = 'https://www.bbc.co.uk/sounds/my?page={}'
 
 # For the container we can use the default chromedriver installed by apk
-# For development we can get webdriver-manager to download it for us
+#  For development we can get webdriver-manager to download it for us
 _DEFAULT_CHROMEDRIVER_PATH = '/usr/bin/chromedriver'
 _USE_DEFAULT_CHROMEDRIVER = Path(_DEFAULT_CHROMEDRIVER_PATH).exists()
 
@@ -55,7 +55,7 @@ def _get_driver():
         if _USE_DEFAULT_CHROMEDRIVER:
             service = Service(_DEFAULT_CHROMEDRIVER_PATH)
         else:
-            service = Service(ChromeDriverManager(log_level=logging.CRITICAL, print_first_line=False).install())
+            service = Service(ChromeDriverManager().install())
 
         _DRIVER = webdriver.Chrome(service=service, options=chrome_options)
         _DRIVER.set_window_size(1024, 1280)
@@ -115,7 +115,8 @@ def get_episode_urls(max_episodes):
     while True:
         page += 1
         driver.get(_URL_BBC_MY_SOUNDS.format(page))
-        locations = driver.find_elements(By.CSS_SELECTOR, 'div.sounds-react-app li a[href*="/play/"]')
+        locations = driver.find_elements(
+            By.CSS_SELECTOR, 'div.sounds-react-app li a[href*="/play/"]')
         page_episode_urls = [anchor.get_attribute('href') for anchor in locations]
         episode_count = len(page_episode_urls)
 

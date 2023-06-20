@@ -1,0 +1,9 @@
+autopep8
+boto3
+feedgen
+pylint
+python-dateutil
+requests
+selenium
+SQLAlchemy
+youtube-dl

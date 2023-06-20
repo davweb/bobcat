@@ -48,7 +48,8 @@ def _get_bucket_client():
     aws_secret_key = os.environ['AWS_SECRET_KEY']
     s3_bucket_name = _bucket_name()
 
-    s3_client = boto3.resource('s3', aws_access_key_id=aws_access_id, aws_secret_access_key=aws_secret_key)
+    s3_client = boto3.resource('s3', aws_access_key_id=aws_access_id,
+                               aws_secret_access_key=aws_secret_key)
     return s3_client.Bucket(s3_bucket_name)
 
 
@@ -73,11 +74,11 @@ def upload_files(filenames):
 
     for filename in filenames:
         bucket.upload_file(filename, filename,
-            ExtraArgs={
-                'ACL': 'public-read',
-                'ContentType': _get_content_type(filename)
-            }
-        )
+                           ExtraArgs={
+                               'ACL': 'public-read',
+                               'ContentType': _get_content_type(filename)
+                           }
+                           )
 
 
 def delete_files(filenames):

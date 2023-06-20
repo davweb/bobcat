@@ -64,7 +64,11 @@ def convert_episode_audio(episode):
         return
 
     logging.info('Coverting audio for episode %s - "%s"', episode.episode_id, episode.title)
-    audio.convert_to_mp3(episode.audio_filename, episode.output_filename, episode.image_filename, episode.title)
+    audio.convert_to_mp3(
+        episode.audio_filename,
+        episode.output_filename,
+        episode.image_filename,
+        episode.title)
 
 
 def configure_logging(logfile):
@@ -77,10 +81,10 @@ def configure_logging(logfile):
         raise ValueError(f'Invalid LOG_LEVEL: {log_level_name}')
 
     logging.basicConfig(encoding='utf-8',
-        filename=logfile,
-        format='%(asctime)s %(levelname)s %(message)s',
-        datefmt='[%Y-%m-%dT%H:%M:%S%z]',
-        level=log_level)
+                        filename=logfile,
+                        format='%(asctime)s %(levelname)s %(message)s',
+                        datefmt='[%Y-%m-%dT%H:%M:%S%z]',
+                        level=log_level)
 
     # Hide library logs
     library_log_level_name = os.environ.get('LIBRARY_LOG_LEVEL', 'CRITICAL')
@@ -110,7 +114,7 @@ def process_configuration():
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
     parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
     parser.add_argument('-n', '--no-episode-refresh', action='store_true',
-        help='Generate feed using only cached episode data')
+                        help='Generate feed using only cached episode data')
     parser.add_argument('-l', '--logfile', type=Path)
     args = parser.parse_args()
     output_dir = args.output_dir
@@ -186,7 +190,8 @@ def get_bucket_contents():
         if error == 'SignatureDoesNotMatch':
             logging.error('AWS Authorization failure. Are the AWS credentials correct?')
         elif error == 'AccessDenied':
-            logging.error('Access denied to S3 bucket. Does the account have the correct permissions?')
+            logging.error(
+                'Access denied to S3 bucket. Does the account have the correct permissions?')
         elif error == 'NoSuchBucket':
             logging.error('Unknown S3 bucket. Is the bucket name correct?')
         elif error is not None:
@@ -235,7 +240,11 @@ def sync_episodes(session, max_episodes):
             session.commit()
             s3sync.upload_files(episode_files)
         except Exception as exception:
-            logging.warning('Failed to sync episode %s - "%s"', episode.episode_id, episode.title, exc_info=exception)
+            logging.warning(
+                'Failed to sync episode %s - "%s"',
+                episode.episode_id,
+                episode.title,
+                exc_info=exception)
             continue
 
         uploaded_episodes.append(episode)
@@ -247,9 +256,9 @@ def sync_episodes(session, max_episodes):
                 logging.debug('Deleted %s', filename)
         except Exception as exception:
             logging.warning('Failed to delete files for episode %s - "%s"',
-                episode.episode_id, episode.title, exc_info=exception)
+                            episode.episode_id, episode.title, exc_info=exception)
 
-    # Delete old files in the S3 bucket
+    #  Delete old files in the S3 bucket
     if bucket_contents:
         change = True
 

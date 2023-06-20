@@ -26,7 +26,7 @@ def _initialise_database():
     database_path = f'{database_dir}/{_DATABASE_NAME}'
     logging.debug('Database is %s', database_path)
 
-    # We need to make sure all models have been imported at least once before
+    #  We need to make sure all models have been imported at least once before
     # creating the DB so we have all the metadata.
     engine = create_engine(f'sqlite:///{database_path}', echo=False)
     _SESSION_MAKER = sessionmaker(engine)

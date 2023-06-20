@@ -6,15 +6,16 @@ import subprocess
 
 TEMP_FILE = 'temporary.mp3'
 
+
 def duration_in_seconds(filename):
     """Return the the duration in seconds of an audio file"""
 
     command = ['ffprobe']
 
-    # only show result and error messages
+    #  only show result and error messages
     command += ['-loglevel', 'error']
 
-    # only out the duration
+    #  only out the duration
     command += ['-show_entries', 'format=duration']
 
     # show the value without labels
@@ -65,7 +66,7 @@ def convert_to_mp3(input_filename, output_filename, cover_art, title):
     command += ['-f', 'mp3']
     command += ['-codec:v', 'mjpeg']
 
-    # metadata
+    #  metadata
     command += ['-metadata', f'title={title}']
 
     # disable writing encoding information as some decoders incorrectly infer VBR if it is there
@@ -74,10 +75,10 @@ def convert_to_mp3(input_filename, output_filename, cover_art, title):
     # don't show banner
     command += ['-hide_banner']
 
-    # disable stdin so ffmpeg doesn't hang when run from a cron job
+    #  disable stdin so ffmpeg doesn't hang when run from a cron job
     command += ['-nostdin']
 
-    # output file
+    #  output file
     command += [TEMP_FILE]
 
     logging.debug('Running command: %s', format(subprocess.list2cmdline(command)))
