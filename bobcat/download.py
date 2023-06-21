@@ -3,13 +3,13 @@
 import logging
 import shutil
 import requests
-import youtube_dl
+from youtube_dl import YoutubeDL
 
 
-def download_file(url, output_filename):
+def download_file(url: str, output_filename: str) -> None:
     """Download a url to a file"""
 
-    response = requests.get(url, stream=True)
+    response = requests.get(url, stream=True, timeout=60)
 
     with open(output_filename, 'wb') as output_file:
         shutil.copyfileobj(response.raw, output_file)
@@ -17,7 +17,7 @@ def download_file(url, output_filename):
     logging.debug('Downloaded %s to file %s', url, output_filename)
 
 
-def download_streaming_audio(url, output_filename):
+def download_streaming_audio(url: str, output_filename: str) -> None:
     """Download streaming audio from a page to an m4a file"""
 
     logger = logging.getLogger('youtube-dl')
@@ -29,7 +29,7 @@ def download_streaming_audio(url, output_filename):
         'noprogress': True
     }
 
-    with youtube_dl.YoutubeDL(ydl_options) as ydl:
+    with YoutubeDL(ydl_options) as ydl:
         ydl.download([url])
 
     logging.debug('Downloaded audio from %s to file %s', url, output_filename)

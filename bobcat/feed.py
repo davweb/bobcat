@@ -1,12 +1,14 @@
 """Generate RSS file"""
 
+from typing import Final
 from feedgen.feed import FeedGenerator
+from bobcat.models import Episode
 
-RSS_FILE = 'podcast.xml'
-LOGO_FILE = 'logo.png'
+RSS_FILE: Final = 'podcast.xml'
+LOGO_FILE: Final = 'logo.png'
 
 
-def create_rss_feed(episodes, podcast_path):
+def create_rss_feed(episodes: list[Episode], podcast_path: str) -> None:
     """Create the RSS file for the episodes"""
     logo_url = f'{podcast_path}/{LOGO_FILE}'
     publication_date = max(episode.published for episode in episodes)

@@ -2,10 +2,11 @@
 
 import os
 import logging
+from typing import Any, Iterable
 import boto3
 
 
-def _get_content_type(filename):
+def _get_content_type(filename: str) -> str:
     """Determine the mime type of each file its extension.
 
     This guesses the mime type of a file by its extension.  As we know the small
@@ -28,20 +29,20 @@ def _get_content_type(filename):
     raise ValueError(f'Could not determine content type for file "{filename}"')
 
 
-def _bucket_name():
+def _bucket_name() -> str:
     """Return S3 bucket name"""
 
     return os.environ['S3_BUCKET_NAME']
 
 
-def bucket_url():
+def bucket_url() -> str:
     """Return URL for accessing S3 bucket"""
 
     s3_bucket_name = _bucket_name()
     return f'https://{s3_bucket_name}.s3.amazonaws.com'
 
 
-def _get_bucket_client():
+def _get_bucket_client() -> Any:
     """Return a client for accessing an S3 Bucket"""
 
     aws_access_id = os.environ['AWS_ACCESS_ID']
@@ -53,20 +54,20 @@ def _get_bucket_client():
     return s3_client.Bucket(s3_bucket_name)
 
 
-def get_bucket_contents():
+def get_bucket_contents() -> set[str]:
     """Return all the keys for an S3 Bucket"""
 
     bucket = _get_bucket_client()
     return set(object.key for object in bucket.objects.all())
 
 
-def upload_file(filename):
+def upload_file(filename: str) -> None:
     """Upload a file to the S3 Bucket"""
 
     upload_files([filename])
 
 
-def upload_files(filenames):
+def upload_files(filenames: Iterable[str]) -> None:
     """Upload files to the S3 Bucket"""
 
     logging.info('Uploading %s to S3 Bucket %s', ','.join(filenames), _bucket_name())
@@ -81,7 +82,7 @@ def upload_files(filenames):
                            )
 
 
-def delete_files(filenames):
+def delete_files(filenames: Iterable[str]) -> None:
     """Delete files from S3 bucket"""
 
     logging.info('Removing %s from S3 Bucket %s', ','.join(filenames), _bucket_name())

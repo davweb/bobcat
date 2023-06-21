@@ -4,30 +4,32 @@ import atexit
 import logging
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
+from typing import Final
 from dateutil import parser
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
 
-
-_URL_BBC_LOGIN = 'https://account.bbc.com/signin'
-_URL_BBC_SOUNDS = 'https://www.bbc.co.uk/sounds'
-_URL_BBC_MY_SOUNDS = 'https://www.bbc.co.uk/sounds/my?page={}'
+_URL_BBC_LOGIN: Final = 'https://account.bbc.com/signin'
+_URL_BBC_SOUNDS: Final = 'https://www.bbc.co.uk/sounds'
+_URL_BBC_MY_SOUNDS: Final = 'https://www.bbc.co.uk/sounds/my?page={}'
 
 # For the container we can use the default chromedriver installed by apk
 #  For development we can get webdriver-manager to download it for us
-_DEFAULT_CHROMEDRIVER_PATH = '/usr/bin/chromedriver'
-_USE_DEFAULT_CHROMEDRIVER = Path(_DEFAULT_CHROMEDRIVER_PATH).exists()
+_DEFAULT_CHROMEDRIVER_PATH: Final = '/usr/bin/chromedriver'
+_USE_DEFAULT_CHROMEDRIVER: Final = Path(_DEFAULT_CHROMEDRIVER_PATH).exists()
 
 if not _USE_DEFAULT_CHROMEDRIVER:
     from webdriver_manager.chrome import ChromeDriverManager
 
-_DRIVER = None
+_DRIVER: WebDriver | None = None
 
 
-def _get_driver():
+def _get_driver() -> WebDriver:
     """Initialise the Selenium driver"""
 
     global _DRIVER
@@ -57,7 +59,7 @@ def _get_driver():
         else:
             service = Service(ChromeDriverManager().install())
 
-        _DRIVER = webdriver.Chrome(service=service, options=chrome_options)
+        _DRIVER = webdriver.Chrome(options=chrome_options, service=service)
         _DRIVER.set_window_size(1024, 1280)
 
         _bbc_login()
@@ -66,7 +68,7 @@ def _get_driver():
     return _DRIVER
 
 
-def clean_up():
+def clean_up() -> None:
     """Tidy up Selenium resources"""
 
     global _DRIVER
@@ -76,7 +78,7 @@ def clean_up():
         _DRIVER = None
 
 
-def _bbc_login():
+def _bbc_login() -> None:
     """Login in to the BBC site"""
 
     bbc_username = os.environ['BBC_EMAIL']
@@ -96,7 +98,7 @@ def _bbc_login():
         sys.exit(1)
 
 
-def _accept_cookie_prompt():
+def _accept_cookie_prompt() -> None:
     """Click on the accept cookies prompt"""
 
     driver = _get_driver()
@@ -105,7 +107,7 @@ def _accept_cookie_prompt():
     accept_cookies[0].click()
 
 
-def get_episode_urls(max_episodes):
+def get_episode_urls(max_episodes: int) -> list[str]:
     """Get the episodes of shows subscribed to on BBC Sounds"""
 
     driver = _get_driver()
@@ -117,7 +119,15 @@ def get_episode_urls(max_episodes):
         driver.get(_URL_BBC_MY_SOUNDS.format(page))
         locations = driver.find_elements(
             By.CSS_SELECTOR, 'div.sounds-react-app li a[href*="/play/"]')
-        page_episode_urls = [anchor.get_attribute('href') for anchor in locations]
+
+        page_episode_urls = []
+
+        for anchor in locations:
+            href = anchor.get_attribute('href')
+
+            if href:
+                page_episode_urls.append(href)
+
         episode_count = len(page_episode_urls)
 
         if episode_count == 0:
@@ -133,13 +143,13 @@ def get_episode_urls(max_episodes):
     return episode_urls
 
 
-def get_episode_metadata(url):
+def get_episode_metadata(url: str) -> dict[str, str | datetime]:
     """Get the metadata for an episode of a show on BBC Sounds"""
 
     driver = _get_driver()
     driver.get(url)
 
-    data = driver.execute_script('return window.__PRELOADED_STATE__;')
+    data = driver.execute_script('return window.__PRELOADED_STATE__;')  # type: ignore
     programme = data['programmes']['current']
 
     titles = programme['titles']

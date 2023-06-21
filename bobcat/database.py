@@ -1,21 +1,24 @@
-"""Manage database via SQLAchemy"""
+"""Manage database via SQLAlchemy"""
 
 import logging
 import os
 import sys
+from typing import Final
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
 
-_DATABASE_NAME = 'bobcat.db'
+_DATABASE_NAME: Final = 'bobcat.db'
 _SESSION_MAKER = None
 
-Base = declarative_base()
+# pylint: disable=too-few-public-methods
 
 
-def _initialise_database():
+class Base(DeclarativeBase):
+    """SQLAlchemy boilerplate"""
+
+
+def _initialise_database() -> sessionmaker:
     """Use SQLAlchemy to initialise the database"""
-
-    global _SESSION_MAKER
 
     database_dir = os.environ.get('DATABASE_DIRECTORY')
 
@@ -29,14 +32,17 @@ def _initialise_database():
     #  We need to make sure all models have been imported at least once before
     # creating the DB so we have all the metadata.
     engine = create_engine(f'sqlite:///{database_path}', echo=False)
-    _SESSION_MAKER = sessionmaker(engine)
+    session_maker = sessionmaker(engine)
     Base.metadata.create_all(engine)
+    return session_maker
 
 
-def make_session():
-    """Return an SQLAchmemy session"""
+def make_session() -> Session:
+    """Return an SQLAchemy session"""
+
+    global _SESSION_MAKER
 
     if _SESSION_MAKER is None:
-        _initialise_database()
+        _SESSION_MAKER = _initialise_database()
 
     return _SESSION_MAKER()

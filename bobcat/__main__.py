@@ -1,4 +1,5 @@
 """Convert BBC Sounds subscription to an RSS Feed."""
+# pylint: disable=broad-exception-caught
 
 import argparse
 import os
@@ -7,6 +8,7 @@ import shutil
 import sys
 from pathlib import Path
 from botocore.exceptions import ClientError
+from sqlalchemy.orm import Session
 from bobcat import audio
 from bobcat import bbc_sounds
 from bobcat import database
@@ -17,14 +19,14 @@ from bobcat import s3sync
 from bobcat.models import Episode
 
 
-def download_episodes(episodes):
+def download_episodes(episodes: list[Episode]) -> None:
     """Download the assets for all episodes"""
 
     for episode in episodes:
         download_episode(episode)
 
 
-def download_episode(episode):
+def download_episode(episode: Episode) -> None:
     """Download all the assets for the episode"""
 
     download_episode_image(episode)
@@ -34,7 +36,7 @@ def download_episode(episode):
     episode.duration_in_seconds = audio.duration_in_seconds(episode.output_filename)
 
 
-def download_episode_image(episode):
+def download_episode_image(episode: Episode) -> None:
     """Download the image files for each episode"""
 
     if Path(episode.image_filename).exists():
@@ -45,7 +47,7 @@ def download_episode_image(episode):
     download.download_file(episode.image_url, episode.image_filename)
 
 
-def download_episode_audio(episode):
+def download_episode_audio(episode: Episode) -> None:
     """Download audio files for each episode"""
 
     if Path(episode.audio_filename).exists():
@@ -56,14 +58,14 @@ def download_episode_audio(episode):
     download.download_streaming_audio(episode.url, episode.audio_filename)
 
 
-def convert_episode_audio(episode):
-    """Convert the dowloaded mp4 file to mp3 and add cover art"""
+def convert_episode_audio(episode: Episode) -> None:
+    """Convert the downloaded mp4 file to mp3 and add cover art"""
 
     if Path(episode.output_filename).exists():
         logging.debug('Audio for episode %s already converted', episode.episode_id)
         return
 
-    logging.info('Coverting audio for episode %s - "%s"', episode.episode_id, episode.title)
+    logging.info('Converting audio for episode %s - "%s"', episode.episode_id, episode.title)
     audio.convert_to_mp3(
         episode.audio_filename,
         episode.output_filename,
@@ -71,7 +73,7 @@ def convert_episode_audio(episode):
         episode.title)
 
 
-def configure_logging(logfile):
+def configure_logging(logfile: str) -> None:
     """Configure logging"""
 
     log_level_name = os.environ.get('LOG_LEVEL', 'INFO')
@@ -98,7 +100,7 @@ def configure_logging(logfile):
     logging.getLogger('youtube-dl').setLevel(library_log_level)
 
 
-def initialise_output_directory(output_dir):
+def initialise_output_directory(output_dir: str) -> None:
     """Initialise the working directory"""
 
     logging.debug('Output directory is %s', output_dir)
@@ -108,7 +110,7 @@ def initialise_output_directory(output_dir):
     os.chdir(output_dir)
 
 
-def process_configuration():
+def process_configuration() -> tuple[bool, int]:
     """Configuration from command line arguments and environment variables"""
 
     parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
@@ -138,7 +140,7 @@ def process_configuration():
     return (cache_only, max_episodes)
 
 
-def load_episode_metadata(episode):
+def load_episode_metadata(episode: Episode) -> None:
     """Get metadata from website"""
 
     metadata = bbc_sounds.get_episode_metadata(episode.url)
@@ -149,7 +151,7 @@ def load_episode_metadata(episode):
     logging.debug('Read metadata for episode %s from website', episode.episode_id)
 
 
-def update_episode_list(session, max_episodes):
+def update_episode_list(session: Session, max_episodes: int) -> None:
     """Update the Episode database from the BBC Website"""
 
     logging.info('Fetching episode list')
@@ -179,7 +181,7 @@ def update_episode_list(session, max_episodes):
     bbc_sounds.clean_up()
 
 
-def get_bucket_contents():
+def get_bucket_contents() -> set[str]:
     """Get S3 Bucket contents, exiting with error on failure"""
 
     try:
@@ -205,7 +207,7 @@ def get_bucket_contents():
         sys.exit(1)
 
 
-def sync_episodes(session, max_episodes):
+def sync_episodes(session: Session, max_episodes: int) -> tuple[list[Episode], bool]:
     """Download episode audio and upload it to S3"""
 
     bucket_contents = get_bucket_contents()
@@ -270,7 +272,7 @@ def sync_episodes(session, max_episodes):
     return uploaded_episodes, change
 
 
-def main():
+def main() -> None:
     """Main"""
 
     (cache_only, max_episodes) = process_configuration()

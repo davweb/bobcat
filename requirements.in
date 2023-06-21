@@ -1,9 +1,13 @@
 autopep8
 boto3
 feedgen
+mypy
 pylint
 python-dateutil
 requests
 selenium
 SQLAlchemy
+types-boto3
+types-python-dateutil
+types-requests
 youtube-dl

@@ -2,12 +2,13 @@
 
 import logging
 import os
+from typing import Final
 import subprocess
 
-TEMP_FILE = 'temporary.mp3'
+TEMP_FILE: Final = 'temporary.mp3'
 
 
-def duration_in_seconds(filename):
+def duration_in_seconds(filename: str) -> int | None:
     """Return the the duration in seconds of an audio file"""
 
     command = ['ffprobe']
@@ -47,7 +48,7 @@ def duration_in_seconds(filename):
         return None
 
 
-def convert_to_mp3(input_filename, output_filename, cover_art, title):
+def convert_to_mp3(input_filename: str, output_filename: str, cover_art: str, title: str) -> None:
     """Convert an audio file to a 128k CBR MP3 file"""
 
     command = ['ffmpeg']
@@ -84,8 +85,9 @@ def convert_to_mp3(input_filename, output_filename, cover_art, title):
     logging.debug('Running command: %s', format(subprocess.list2cmdline(command)))
 
     with subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as process:
-        for output_line in iter(process.stdout.readline, ""):
-            logging.debug('Output: %s', output_line.strip())
+        if process.stdout:
+            for output_line in iter(process.stdout.readline, ""):
+                logging.debug('Output: %s', output_line.strip())
 
     exit_code = process.returncode
     logging.debug('Command completed with exit code: %d', exit_code)

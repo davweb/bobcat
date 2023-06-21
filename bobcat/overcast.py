@@ -2,20 +2,22 @@
 
 import logging
 import os
+from typing import Final
 import requests
 
-_OVERCAST_URL = 'https://overcast.fm/ping?urlprefix={}'
+
+_OVERCAST_URL: Final = 'https://overcast.fm/ping'
+_OVERCAST_PREFIX_PARAM: Final = 'urlprefix'
 
 
-def ping(feed_url):
+def ping(feed_url: str) -> None:
     """Ping Overcast with feed Url"""
 
     if os.environ.get('OVERCAST') is None:
         logging.debug('Overcast ping is not enabled.')
     else:
-        url = _OVERCAST_URL.format(requests.utils.quote(feed_url))
-        logging.debug('Pinging Overcast at "%s"', url)
-        result = requests.get(url)
+        logging.debug('Pinging Overcast.')
+        result = requests.get(url=_OVERCAST_URL, params={_OVERCAST_PREFIX_PARAM: feed_url}, timeout=60)
 
         if result.status_code == 200:
             logging.info('Successfully pinged Overcast.')
