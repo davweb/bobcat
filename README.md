@@ -41,7 +41,7 @@ If the bucket used is called `s3-bucket-name` then the podcast feel will be avai
 
 ## Environment Variables
 
-The Environment Varitables used by the Docker container are as follows:
+The Environment Variables used by the Docker container are as follows:
 
 | Variable | Description | Required | Default |
 | ------ | ------ | ------ | ------ |
