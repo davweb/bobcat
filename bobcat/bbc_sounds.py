@@ -88,6 +88,8 @@ def _bbc_login() -> None:
     driver.get(_URL_BBC_LOGIN)
     username_field = driver.find_element(By.ID, 'user-identifier-input')
     username_field.send_keys(bbc_username)
+    submit_button = driver.find_element(By.ID, 'submit-button')
+    submit_button.click()
     password_field = driver.find_element(By.ID, 'password-input')
     password_field.send_keys(bbc_password)
     submit_button = driver.find_element(By.ID, 'submit-button')
