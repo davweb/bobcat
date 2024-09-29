@@ -1,8 +1,8 @@
 # Use edge to get latest Chromium and ffmpeg
-FROM alpine:edge as base
+FROM alpine:edge AS base
 
 # Use a builder image for compiling dependencies
-FROM base as builder
+FROM base AS builder
 
 # Install python and the dependencies we need to build the python dependencies
 RUN apk add --no-cache python3 gcc musl-dev libffi-dev python3-dev
@@ -35,4 +35,4 @@ RUN /usr/bin/crontab crontab.txt
 ENV PYTHONUNBUFFERED=1
 
 # Source the python virtual environment and run our entrypoint
-CMD source /app/venv/bin/activate && sh /app/entrypoint.sh
+CMD ["sh", "/app/entrypoint.sh"]

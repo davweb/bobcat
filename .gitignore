@@ -130,6 +130,7 @@ dmypy.json
 /etc
 /share
 bin
+
 /run_bobcat.sh
 /.vscode
 /container-data
@@ -138,3 +139,4 @@ bin
 /bobcat.tar
 /export.sh
 /requirements.txt
+/publish.sh

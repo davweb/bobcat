@@ -118,9 +118,10 @@ def get_episode_urls(max_episodes: int) -> list[str]:
 
     while True:
         page += 1
+        logging.debug('Opening page %d', page)
         driver.get(_URL_BBC_MY_SOUNDS.format(page))
         locations = driver.find_elements(
-            By.CSS_SELECTOR, 'div.sounds-react-app li a[href*="/play/"]')
+            By.CSS_SELECTOR, 'main li a[href*="/play/"]')
 
         page_episode_urls = []
 
