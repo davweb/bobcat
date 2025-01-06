@@ -105,7 +105,7 @@ def _accept_cookie_prompt() -> None:
 
     driver = _get_driver()
     driver.get(_URL_BBC_SOUNDS)
-    accept_cookies = driver.find_elements(By.CSS_SELECTOR, '#bbccookies-continue-button')
+    accept_cookies = driver.find_elements(By.CSS_SELECTOR, '#bbccookies-accept-button')
     accept_cookies[0].click()
 
 
