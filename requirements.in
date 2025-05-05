@@ -10,4 +10,5 @@ SQLAlchemy
 types-boto3
 types-python-dateutil
 types-requests
+user-agent
 youtube-dl

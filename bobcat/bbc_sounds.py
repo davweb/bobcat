@@ -9,10 +9,12 @@ from pathlib import Path
 from typing import Final
 from dateutil import parser
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
+import user_agent
 
 _URL_BBC_LOGIN: Final = 'https://account.bbc.com/signin'
 _URL_BBC_SOUNDS: Final = 'https://www.bbc.co.uk/sounds'
@@ -52,6 +54,12 @@ def _get_driver() -> WebDriver:
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--disable-dev-shm-usage')
 
+            #  hide that we're automated
+            chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+            spoof_user_agent = user_agent.generate_user_agent(os='mac', navigator='chrome')
+            chrome_options.add_argument(f'--user-agent={spoof_user_agent}')
+            logging.info(spoof_user_agent)
+
             atexit.register(clean_up)
 
         if _USE_DEFAULT_CHROMEDRIVER:
@@ -62,8 +70,14 @@ def _get_driver() -> WebDriver:
         _DRIVER = webdriver.Chrome(options=chrome_options, service=service)
         _DRIVER.set_window_size(1024, 1280)
 
+        # TODO - add screenshot capture properly
+        # try:
         _bbc_login()
         _accept_cookie_prompt()
+        # except NoSuchElementException:
+        #     logging.exception('Failed to find an expected element')
+        #     _DRIVER.get_screenshot_as_file('/bobcat/error.png')
+        #     sys.exit(1)
 
     return _DRIVER
 
@@ -86,11 +100,21 @@ def _bbc_login() -> None:
 
     driver = _get_driver()
     driver.get(_URL_BBC_LOGIN)
-    username_field = driver.find_element(By.ID, 'user-identifier-input')
+
+    try:
+        username_field = driver.find_element(By.ID, 'user-identifier-input')
+    except NoSuchElementException:
+        username_field = driver.find_element(By.CSS_SELECTOR, '[data-testid="input"]')
+
     username_field.send_keys(bbc_username)
     submit_button = driver.find_element(By.ID, 'submit-button')
     submit_button.click()
-    password_field = driver.find_element(By.ID, 'password-input')
+
+    try:
+        password_field = driver.find_element(By.ID, 'password-input')
+    except NoSuchElementException:
+        password_field = driver.find_element(By.CSS_SELECTOR, '[data-testid="input"]')
+
     password_field.send_keys(bbc_password)
     submit_button = driver.find_element(By.ID, 'submit-button')
     submit_button.click()
@@ -105,7 +129,11 @@ def _accept_cookie_prompt() -> None:
 
     driver = _get_driver()
     driver.get(_URL_BBC_SOUNDS)
-    accept_cookies = driver.find_elements(By.CSS_SELECTOR, '[data-testid="accept-button"]')
+    accept_cookies = driver. find_elements(By.CSS_SELECTOR, '#bbccookies-accept-button')
+
+    if len(accept_cookies) == 0:
+        accept_cookies = driver.find_elements(By.CSS_SELECTOR, '[data-testid="accept-button"]')
+
     accept_cookies[0].click()
 
 

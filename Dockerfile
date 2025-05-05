@@ -1,5 +1,5 @@
 # Use edge to get latest Chromium and ffmpeg
-FROM alpine:edge AS base
+FROM alpine:latest AS base
 
 # Use a builder image for compiling dependencies
 FROM base AS builder
