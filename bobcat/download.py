@@ -4,12 +4,13 @@ import logging
 import shutil
 import requests
 from youtube_dl import YoutubeDL
+from .config import CONFIG
 
 
 def download_file(url: str, output_filename: str) -> None:
     """Download a url to a file"""
 
-    response = requests.get(url, stream=True, timeout=60)
+    response = requests.get(url, stream=True, timeout=CONFIG.request_timeout)
 
     with open(output_filename, 'wb') as output_file:
         shutil.copyfileobj(response.raw, output_file)

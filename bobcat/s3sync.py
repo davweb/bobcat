@@ -1,9 +1,9 @@
 """Sync local files with Amazon S3"""
 
-import os
 import logging
 from typing import Any, Iterable
 import boto3
+from .config import CONFIG
 
 
 def _get_content_type(filename: str) -> str:
@@ -29,29 +29,19 @@ def _get_content_type(filename: str) -> str:
     raise ValueError(f'Could not determine content type for file "{filename}"')
 
 
-def _bucket_name() -> str:
-    """Return S3 bucket name"""
-
-    return os.environ['S3_BUCKET_NAME']
-
-
 def bucket_url() -> str:
     """Return URL for accessing S3 bucket"""
 
-    s3_bucket_name = _bucket_name()
-    return f'https://{s3_bucket_name}.s3.amazonaws.com'
+    return f'https://{CONFIG.s3_bucket_name}.s3.amazonaws.com'
 
 
 def _get_bucket_client() -> Any:
     """Return a client for accessing an S3 Bucket"""
 
-    aws_access_id = os.environ['AWS_ACCESS_ID']
-    aws_secret_key = os.environ['AWS_SECRET_KEY']
-    s3_bucket_name = _bucket_name()
-
-    s3_client = boto3.resource('s3', aws_access_key_id=aws_access_id,
-                               aws_secret_access_key=aws_secret_key)
-    return s3_client.Bucket(s3_bucket_name)
+    s3_client = boto3.resource('s3',
+                               aws_access_key_id=CONFIG.aws_access_id,
+                               aws_secret_access_key=CONFIG.aws_secret_key)
+    return s3_client.Bucket(CONFIG.s3_bucket_name)
 
 
 def get_bucket_contents() -> set[str]:
@@ -70,7 +60,7 @@ def upload_file(filename: str) -> None:
 def upload_files(filenames: Iterable[str]) -> None:
     """Upload files to the S3 Bucket"""
 
-    logging.info('Uploading %s to S3 Bucket %s', ','.join(filenames), _bucket_name())
+    logging.info('Uploading %s to S3 Bucket %s', ','.join(filenames), CONFIG.s3_bucket_name)
     bucket = _get_bucket_client()
 
     for filename in filenames:
@@ -85,7 +75,7 @@ def upload_files(filenames: Iterable[str]) -> None:
 def delete_files(filenames: Iterable[str]) -> None:
     """Delete files from S3 bucket"""
 
-    logging.info('Removing %s from S3 Bucket %s', ','.join(filenames), _bucket_name())
+    logging.info('Removing %s from S3 Bucket %s', ','.join(filenames), CONFIG.s3_bucket_name)
 
     bucket = _get_bucket_client()
     objects_to_delete = [{'Key': filename} for filename in filenames]

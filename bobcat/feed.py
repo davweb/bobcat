@@ -2,7 +2,7 @@
 
 from typing import Final
 from feedgen.feed import FeedGenerator
-from bobcat.models import Episode
+from .models import Episode
 
 RSS_FILE: Final = 'podcast.xml'
 LOGO_FILE: Final = 'logo.png'

@@ -2,7 +2,6 @@
 
 import atexit
 import logging
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -15,18 +14,21 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 import user_agent
+from .config import CONFIG
 
 _URL_BBC_LOGIN: Final = 'https://account.bbc.com/signin'
 _URL_BBC_SOUNDS: Final = 'https://www.bbc.co.uk/sounds'
 _URL_BBC_MY_SOUNDS: Final = 'https://www.bbc.co.uk/sounds/my?page={}'
 
-# For the container we can use the default chromedriver installed by apk
-#  For development we can get webdriver-manager to download it for us
+# For the container we can use the default chromedriver installed by apt
+# For development we can get webdriver-manager to download it for us
 _DEFAULT_CHROMEDRIVER_PATH: Final = '/usr/bin/chromedriver'
-_USE_DEFAULT_CHROMEDRIVER: Final = Path(_DEFAULT_CHROMEDRIVER_PATH).exists()
 
-if not _USE_DEFAULT_CHROMEDRIVER:
+if Path(_DEFAULT_CHROMEDRIVER_PATH).exists():
+    SERVICE = Service(_DEFAULT_CHROMEDRIVER_PATH)
+else:
     from webdriver_manager.chrome import ChromeDriverManager
+    SERVICE = Service(ChromeDriverManager().install())
 
 _DRIVER: WebDriver | None = None
 
@@ -38,9 +40,8 @@ def _get_driver() -> WebDriver:
 
     if _DRIVER is None:
         chrome_options = Options()
-        foreground = 'SHOW_BROWSER' in os.environ
 
-        if foreground:
+        if CONFIG.show_browser:
             chrome_options.add_experimental_option('detach', True)
         else:
             # Run headless
@@ -62,12 +63,7 @@ def _get_driver() -> WebDriver:
 
             atexit.register(clean_up)
 
-        if _USE_DEFAULT_CHROMEDRIVER:
-            service = Service(_DEFAULT_CHROMEDRIVER_PATH)
-        else:
-            service = Service(ChromeDriverManager().install())
-
-        _DRIVER = webdriver.Chrome(options=chrome_options, service=service)
+        _DRIVER = webdriver.Chrome(options=chrome_options, service=SERVICE)
         _DRIVER.set_window_size(1024, 1280)
 
         # TODO - add screenshot capture properly
@@ -95,9 +91,6 @@ def clean_up() -> None:
 def _bbc_login() -> None:
     """Login in to the BBC site"""
 
-    bbc_username = os.environ['BBC_EMAIL']
-    bbc_password = os.environ['BBC_PASSWORD']
-
     driver = _get_driver()
     driver.get(_URL_BBC_LOGIN)
 
@@ -106,7 +99,7 @@ def _bbc_login() -> None:
     except NoSuchElementException:
         username_field = driver.find_element(By.CSS_SELECTOR, '[data-testid="input"]')
 
-    username_field.send_keys(bbc_username)
+    username_field.send_keys(CONFIG.bbc_username)
     submit_button = driver.find_element(By.ID, 'submit-button')
     submit_button.click()
 
@@ -115,7 +108,7 @@ def _bbc_login() -> None:
     except NoSuchElementException:
         password_field = driver.find_element(By.CSS_SELECTOR, '[data-testid="input"]')
 
-    password_field.send_keys(bbc_password)
+    password_field.send_keys(CONFIG.bbc_password)
     submit_button = driver.find_element(By.ID, 'submit-button')
     submit_button.click()
 
@@ -137,7 +130,7 @@ def _accept_cookie_prompt() -> None:
     accept_cookies[0].click()
 
 
-def get_episode_urls(max_episodes: int) -> list[str]:
+def get_episode_urls() -> list[str]:
     """Get the episodes of shows subscribed to on BBC Sounds"""
 
     driver = _get_driver()
@@ -167,8 +160,8 @@ def get_episode_urls(max_episodes: int) -> list[str]:
         logging.debug('Found %d episodes on page %d', episode_count, page)
         episode_urls += page_episode_urls
 
-        if len(episode_urls) >= max_episodes:
-            episode_urls = episode_urls[:max_episodes]
+        if len(episode_urls) >= CONFIG.max_episodes:
+            episode_urls = episode_urls[:CONFIG.max_episodes]
             break
 
     return episode_urls

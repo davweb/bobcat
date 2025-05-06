@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import mapped_column
-from bobcat.database import Base
+from .database import Base
 
 
 class Episode(Base):

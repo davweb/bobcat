@@ -1,7 +1,6 @@
 """Convert BBC Sounds subscription to an RSS Feed."""
 # pylint: disable=broad-exception-caught
 
-import argparse
 import os
 import logging
 import shutil
@@ -9,14 +8,15 @@ import sys
 from pathlib import Path
 from botocore.exceptions import ClientError
 from sqlalchemy.orm import Session
-from bobcat import audio
-from bobcat import bbc_sounds
-from bobcat import database
-from bobcat import download
-from bobcat import feed
-from bobcat import overcast
-from bobcat import s3sync
-from bobcat.models import Episode
+from . import audio
+from . import bbc_sounds
+from . import database
+from . import download
+from . import feed
+from . import overcast
+from . import s3sync
+from .models import Episode
+from .config import CONFIG
 
 
 def download_episodes(episodes: list[Episode]) -> None:
@@ -73,24 +73,27 @@ def convert_episode_audio(episode: Episode) -> None:
         episode.title)
 
 
-def configure_logging(logfile: str) -> None:
+def configure_logging() -> None:
     """Configure logging"""
 
-    log_level_name = os.environ.get('LOG_LEVEL', 'INFO')
-    log_level = logging.getLevelName(log_level_name)
+    log_level = logging.getLevelName(CONFIG.log_level)
 
     if isinstance(log_level, str):
-        raise ValueError(f'Invalid LOG_LEVEL: {log_level_name}')
+        raise ValueError(f'Invalid LOG_LEVEL: {CONFIG.log_level}')
 
     logging.basicConfig(encoding='utf-8',
-                        filename=logfile,
+                        filename=CONFIG.logfile,
                         format='%(asctime)s %(levelname)s %(message)s',
                         datefmt='[%Y-%m-%dT%H:%M:%S%z]',
                         level=log_level)
 
+    logging.debug('Starting')
+
     # Hide library logs
-    library_log_level_name = os.environ.get('LIBRARY_LOG_LEVEL', 'CRITICAL')
-    library_log_level = logging.getLevelName(library_log_level_name)
+    library_log_level = logging.getLevelName(CONFIG.library_log_level)
+
+    if isinstance(library_log_level, str):
+        raise ValueError(f'Invalid LIBRARY_LOG_LEVEL: {CONFIG.library_log_level}')
 
     logging.getLogger('boto3').setLevel(library_log_level)
     logging.getLogger('botocore').setLevel(library_log_level)
@@ -100,44 +103,14 @@ def configure_logging(logfile: str) -> None:
     logging.getLogger('youtube-dl').setLevel(library_log_level)
 
 
-def initialise_output_directory(output_dir: str) -> None:
+def initialise_output_directory() -> None:
     """Initialise the working directory"""
 
-    logging.debug('Output directory is %s', output_dir)
+    logging.debug('Output directory is %s', CONFIG.output_dir)
 
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    shutil.copy2(feed.LOGO_FILE, output_dir)
-    os.chdir(output_dir)
-
-
-def process_configuration() -> tuple[bool, int]:
-    """Configuration from command line arguments and environment variables"""
-
-    parser = argparse.ArgumentParser(description='Convert BBC Sounds subscription to an RSS Feed.')
-    parser.add_argument('-o', '--output-dir', required=True, help='Output Directory')
-    parser.add_argument('-n', '--no-episode-refresh', action='store_true',
-                        help='Generate feed using only cached episode data')
-    parser.add_argument('-l', '--logfile', type=Path)
-    args = parser.parse_args()
-    output_dir = args.output_dir
-    cache_only = args.no_episode_refresh
-    logfile = args.logfile
-
-    configure_logging(logfile)
-    logging.debug('Starting')
-    initialise_output_directory(output_dir)
-
-    try:
-        max_episodes = int(os.environ['EPISODE_LIMIT'])
-        logging.debug('Episodes limit is %d', max_episodes)
-    except (KeyError, ValueError):
-        max_episodes = 20
-        logging.info('Defaulting episode limit to %d', max_episodes)
-
-    if cache_only:
-        logging.info('Generating feed using only cached data')
-
-    return (cache_only, max_episodes)
+    Path(CONFIG.output_dir).mkdir(parents=True, exist_ok=True)
+    shutil.copy2(feed.LOGO_FILE, CONFIG.output_dir)
+    os.chdir(CONFIG.output_dir)
 
 
 def load_episode_metadata(episode: Episode) -> None:
@@ -151,11 +124,11 @@ def load_episode_metadata(episode: Episode) -> None:
     logging.debug('Read metadata for episode %s from website', episode.episode_id)
 
 
-def update_episode_list(session: Session, max_episodes: int) -> None:
+def update_episode_list(session: Session) -> None:
     """Update the Episode database from the BBC Website"""
 
     logging.info('Fetching episode list')
-    episode_urls = bbc_sounds.get_episode_urls(max_episodes)
+    episode_urls = bbc_sounds.get_episode_urls()
     episodes = []
     new_episode_count = 0
     query = session.query(Episode)
@@ -207,7 +180,7 @@ def get_bucket_contents() -> set[str]:
         sys.exit(1)
 
 
-def sync_episodes(session: Session, max_episodes: int) -> tuple[list[Episode], bool]:
+def sync_episodes(session: Session) -> tuple[list[Episode], bool]:
     """Download episode audio and upload it to S3"""
 
     bucket_contents = get_bucket_contents()
@@ -224,7 +197,7 @@ def sync_episodes(session: Session, max_episodes: int) -> tuple[list[Episode], b
     bucket_contents.remove(feed.RSS_FILE)
 
     query = session.query(Episode)
-    episodes = query.filter().order_by(Episode.published_utc.desc()).limit(max_episodes).all()
+    episodes = query.filter().order_by(Episode.published_utc.desc()).limit(CONFIG.max_episodes).all()
     uploaded_episodes = []
 
     for episode in episodes:
@@ -275,14 +248,17 @@ def sync_episodes(session: Session, max_episodes: int) -> tuple[list[Episode], b
 def main() -> None:
     """Main"""
 
-    (cache_only, max_episodes) = process_configuration()
+    configure_logging()
+    logging.info('Episode limit is %d', CONFIG.max_episodes)
 
     with database.make_session() as session:
 
-        if not cache_only:
-            update_episode_list(session, max_episodes)
+        if CONFIG.cache_only:
+            logging.info('Generating feed using only cached data')
+        else:
+            update_episode_list(session)
 
-        episodes, change = sync_episodes(session, max_episodes)
+        episodes, change = sync_episodes(session)
 
         if change:
             podcast_path = s3sync.bucket_url()
