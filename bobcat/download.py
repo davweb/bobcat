@@ -3,7 +3,7 @@
 import logging
 import shutil
 import requests
-from youtube_dl import YoutubeDL
+from yt_dlp import YoutubeDL
 from .config import CONFIG
 
 
