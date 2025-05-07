@@ -59,7 +59,6 @@ def _get_driver() -> WebDriver:
             chrome_options.add_argument('--disable-blink-features=AutomationControlled')
             spoof_user_agent = user_agent.generate_user_agent(os='mac', navigator='chrome')
             chrome_options.add_argument(f'--user-agent={spoof_user_agent}')
-            logging.info(spoof_user_agent)
 
             atexit.register(clean_up)
 
