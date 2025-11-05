@@ -172,8 +172,12 @@ def get_episode_metadata(url: str) -> dict[str, str | datetime]:
     driver = _get_driver()
     driver.get(url)
 
-    data = driver.execute_script('return window.__PRELOADED_STATE__;')  # type: ignore
-    programme = data['programmes']['current']
+    programme = driver.execute_script("""
+        let dehydratedQueries = window.__NEXT_DATA__.props.pageProps.dehydratedState.queries;
+        let pageData = dehydratedQueries.filter(q => q.queryKey[0].startsWith('/v2/my/experience/inline/play/'))[0].state.data.data;
+        let episodeData = pageData.filter(q => q.id == 'aod_play_area')[0].data[0];
+        return episodeData;
+        """)  # type: ignore
 
     titles = programme['titles']
     title = titles['primary']

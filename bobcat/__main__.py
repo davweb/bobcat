@@ -55,7 +55,9 @@ def download_episode_audio(episode: Episode) -> None:
         return
 
     logging.info('Downloading audio for episode %s - "%s"', episode.episode_id, episode.title)
-    download.download_streaming_audio(episode.url, episode.audio_filename)
+    # Workaround for yt-dlp not handling BBC Sounds URLs - https://github.com/yt-dlp/yt-dlp/issues/14569
+    download_url = episode.url.replace('https://www.bbc.co.uk/sounds/play/', 'https://www.bbc.co.uk/programmes/')
+    download.download_streaming_audio(download_url, episode.audio_filename)
 
 
 def convert_episode_audio(episode: Episode) -> None:
