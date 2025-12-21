@@ -13,8 +13,6 @@ def ping(feed_url: str) -> None:
     """Ping Overcast with feed Url"""
 
     if CONFIG.ping_overcast:
-        logging.debug('Overcast ping is not enabled.')
-    else:
         logging.debug('Pinging Overcast.')
         result = requests.get(url=_OVERCAST_URL, params={_OVERCAST_PREFIX_PARAM: feed_url},
                               timeout=CONFIG.request_timeout)
@@ -23,3 +21,5 @@ def ping(feed_url: str) -> None:
             logging.info('Successfully pinged Overcast.')
         else:
             logging.warning('Overcast ping failed with status code %d', result.status_code)
+    else:
+        logging.debug('Overcast ping is not enabled.')

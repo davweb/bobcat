@@ -8,11 +8,13 @@ from pathlib import Path
 from typing import Final
 from dateutil import parser
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 import user_agent
 from .config import CONFIG
 
@@ -92,23 +94,34 @@ def _bbc_login() -> None:
 
     driver = _get_driver()
     driver.get(_URL_BBC_LOGIN)
+    wait = WebDriverWait(driver, 10)
 
     try:
-        username_field = driver.find_element(By.ID, 'user-identifier-input')
-    except NoSuchElementException:
-        username_field = driver.find_element(By.CSS_SELECTOR, '[data-testid="input"]')
+        username_field = wait.until(EC.any_of(
+            EC.presence_of_element_located((By.ID, 'username')),
+            EC.presence_of_element_located((By.ID, 'user-identifier-input'))
+        ))
+    except TimeoutException:
+        logging.error('Did not find username field for BBC login')
+        sys.exit(1)
 
     username_field.send_keys(CONFIG.bbc_username)
-    submit_button = driver.find_element(By.ID, 'submit-button')
+
+    submit_button = wait.until(EC.element_to_be_clickable((By.ID, 'submit-button')))
     submit_button.click()
 
     try:
-        password_field = driver.find_element(By.ID, 'password-input')
-    except NoSuchElementException:
-        password_field = driver.find_element(By.CSS_SELECTOR, '[data-testid="input"]')
+        password_field = wait.until(EC.any_of(
+            EC.presence_of_element_located((By.ID, 'password')),
+            EC.presence_of_element_located((By.ID, 'password-input'))
+        ))
+    except TimeoutException:
+        logging.error('Did not find password field for BBC login')
+        sys.exit(1)
 
     password_field.send_keys(CONFIG.bbc_password)
-    submit_button = driver.find_element(By.ID, 'submit-button')
+
+    submit_button = wait.until(EC.element_to_be_clickable((By.ID, 'submit-button')))
     submit_button.click()
 
     if driver.current_url.startswith(_URL_BBC_LOGIN):
@@ -121,12 +134,18 @@ def _accept_cookie_prompt() -> None:
 
     driver = _get_driver()
     driver.get(_URL_BBC_SOUNDS)
-    accept_cookies = driver. find_elements(By.CSS_SELECTOR, '#bbccookies-accept-button')
+    wait = WebDriverWait(driver, 10)
 
-    if len(accept_cookies) == 0:
-        accept_cookies = driver.find_elements(By.CSS_SELECTOR, '[data-testid="accept-button"]')
+    try:
+        accept_cookies = wait.until(EC.any_of(
+            EC.element_to_be_clickable((By.ID, 'bbccookies-accept-button')),
+            EC.element_to_be_clickable((By.CSS_SELECTOR, '[data-testid="accept-button"]'))
+        ))
+    except TimeoutException:
+        logging.error('Did not find BBC cookie banner')
+        sys.exit(1)
 
-    accept_cookies[0].click()
+    accept_cookies.click()
 
 
 def get_episode_urls() -> list[str]:
