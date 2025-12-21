@@ -3,6 +3,7 @@ boto3
 feedgen
 mypy
 pylint
+pytest
 python-dateutil
 requests
 selenium
@@ -10,5 +11,6 @@ SQLAlchemy
 types-boto3
 types-python-dateutil
 types-requests
+types-yt-dlp
 user-agent
 yt-dlp

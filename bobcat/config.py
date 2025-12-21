@@ -4,6 +4,7 @@
 import argparse
 import os
 from pathlib import Path
+import sys
 
 
 def _get_arguments() -> argparse.Namespace:
@@ -20,8 +21,24 @@ def _get_arguments() -> argparse.Namespace:
 class Config:
     """Configuration class"""
 
+    @staticmethod
+    def is_running_in_test() -> bool:
+        """
+        Returns True if the code is running under a pytest test session.
+        """
+        return "pytest" in sys.modules or "unittest" in sys.modules
+
     def __init__(self) -> None:
-        self._args = _get_arguments()
+        if not Config.is_running_in_test():
+            self._args = _get_arguments()
+        else:
+            # In a test environment, provide a default Namespace.
+            # Tests can patch properties as needed.
+            self._args = argparse.Namespace(
+                output_dir=None,
+                no_episode_refresh=False,
+                logfile=None,
+            )
 
     @property
     def request_timeout(self) -> int:
