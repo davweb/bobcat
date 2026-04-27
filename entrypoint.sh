@@ -34,7 +34,7 @@ debug `chromium-browser --version`
 debug `ffmpeg -version | head -1`
 
 # Source environment
-source /app/venv/bin/activate
+source /app/.venv/bin/activate
 
 # Run now
 /app/run.sh

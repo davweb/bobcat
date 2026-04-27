@@ -1,24 +1,27 @@
 # Use edge to get latest Chromium and ffmpeg
 FROM alpine:latest AS base
 
-# Use a builder image for compiling dependencies
+# Use a builder image for compiling dependencies
 FROM base AS builder
 
-# Install python and the dependencies we need to build the python dependencies
-RUN apk add --no-cache python3 gcc musl-dev libffi-dev python3-dev
-# Build a virtual env to build the python dependencies in to
-RUN python3 -m venv /app/venv
-# Install python dependenices into temporary build image
-COPY requirements.txt /app
-RUN source /app/venv/bin/activate && pip3 install --requirement /app/requirements.txt
+# Install python, uv, and the dependencies we need to build the python dependencies
+RUN apk add --no-cache uv python3 gcc musl-dev libffi-dev python3-dev
 
-# Build the main image
+# Copy dependency manifests
+COPY pyproject.toml uv.lock /app/
+
+# Install only production deps into .venv, using the locked versions
+WORKDIR /app
+ENV UV_COMPILE_BYTECODE=1 UV_PYTHON_DOWNLOADS=0 UV_PYTHON=python3
+RUN uv sync --frozen --no-dev
+
+# Build the main image
 FROM base
 
 # Install python and runtime dependencies
 RUN apk add --no-cache python3 ffmpeg chromium chromium-chromedriver
-# Copy the build python dependencies from the builder image
-COPY --from=builder /app/venv /app/venv
+# Copy the built python dependencies from the builder image
+COPY --from=builder /app/.venv /app/.venv
 
 WORKDIR /app
 

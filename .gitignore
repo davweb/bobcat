@@ -139,3 +139,4 @@ bin
 /bobcat.tar
 /export.sh
 .history
+.claude/settings.json

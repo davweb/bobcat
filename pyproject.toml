@@ -1,3 +1,31 @@
+[project]
+name = "bobcat"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3",
+    "feedgen",
+    "python-dateutil",
+    "requests",
+    "selenium",
+    "SQLAlchemy",
+    "user-agent",
+    "yt-dlp",
+]
+
+[dependency-groups]
+dev = [
+    "autopep8",
+    "mypy",
+    "pylint",
+    "pytest",
+    "types-boto3",
+    "types-python-dateutil",
+    "types-requests",
+    "types-yt-dlp",
+    "webdriver_manager",
+]
+
 [tool.autopep8]
 max_line_length = 120
 in-place = true
