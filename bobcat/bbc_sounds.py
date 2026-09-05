@@ -19,6 +19,7 @@ import user_agent
 from .config import CONFIG
 
 _URL_BBC_LOGIN: Final = 'https://account.bbc.com/signin'
+_HOST_BBC_LOGIN: Final = 'account.bbc.com'
 _URL_BBC_SOUNDS: Final = 'https://www.bbc.co.uk/sounds'
 _URL_BBC_MY_SOUNDS: Final = 'https://www.bbc.co.uk/sounds/my?page={}'
 
@@ -124,7 +125,11 @@ def _bbc_login() -> None:
     submit_button = wait.until(EC.element_to_be_clickable((By.ID, 'submit-button')))
     submit_button.click()
 
-    if driver.current_url.startswith(_URL_BBC_LOGIN):
+    # Signing in redirects via session.bbc.co.uk, which is what sets the session
+    # cookies on bbc.co.uk. Navigating away before that lands loses the session.
+    try:
+        wait.until(lambda d: _HOST_BBC_LOGIN not in d.current_url)
+    except TimeoutException:
         logging.error('BBC login failed. Are the credentials correct?')
         sys.exit(1)
 
