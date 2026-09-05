@@ -2,9 +2,14 @@
 
 import logging
 import shutil
+from typing import TYPE_CHECKING
 import requests
 from yt_dlp import YoutubeDL
 from .config import CONFIG
+
+if TYPE_CHECKING:
+    # Only defined in the yt-dlp type stubs, not at runtime
+    from yt_dlp import _Params
 
 
 def download_file(url: str, output_filename: str) -> None:
@@ -23,10 +28,12 @@ def download_streaming_audio(url: str, output_filename: str) -> None:
 
     logger = logging.getLogger('youtube-dl')
 
-    ydl_options = {
+    ydl_options: '_Params' = {
         'outtmpl': output_filename,
         'format': 'bestaudio[ext=m4a]',
-        'logger': logger,
+        # yt-dlp only needs debug, warning and error methods, but its stubs
+        # declare a stricter protocol that logging.Logger does not satisfy
+        'logger': logger,  # type: ignore[typeddict-item]
         'noprogress': True
     }
 
