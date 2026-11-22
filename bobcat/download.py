@@ -9,7 +9,7 @@ from .config import CONFIG
 
 if TYPE_CHECKING:
     # Only defined in the yt-dlp type stubs, not at runtime
-    from yt_dlp import _Params
+    from yt_dlp import _YoutubeDLOptions
 
 
 def download_file(url: str, output_filename: str) -> None:
@@ -28,7 +28,7 @@ def download_streaming_audio(url: str, output_filename: str) -> None:
 
     logger = logging.getLogger('youtube-dl')
 
-    ydl_options: '_Params' = {
+    ydl_options: '_YoutubeDLOptions' = {
         'outtmpl': output_filename,
         'format': 'bestaudio[ext=m4a]',
         # yt-dlp only needs debug, warning and error methods, but its stubs
