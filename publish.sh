@@ -1,2 +1,3 @@
 DATE=$(date +'%Y-%m-%d')
-docker buildx build --platform linux/amd64,linux/arm64 -t "davweb/bobcat:${DATE}" -t "davweb/bobcat:latest" --push .
+IMAGE="ghcr.io/davweb/bobcat"
+docker buildx build --platform linux/amd64,linux/arm64 -t "${IMAGE}:${DATE}" -t "${IMAGE}:latest" --push .

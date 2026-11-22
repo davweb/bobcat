@@ -1,0 +1,21 @@
+services:
+  bobcat:
+    image: ghcr.io/davweb/bobcat:latest
+    container_name: bobcat
+    restart: unless-stopped
+    environment:
+      BBC_EMAIL: you@example.com
+      BBC_PASSWORD: your-bbc-password
+      AWS_ACCESS_ID: your-aws-access-id
+      AWS_SECRET_KEY: your-aws-secret-key
+      S3_BUCKET_NAME: s3-bucket-name
+      # EPISODE_LIMIT: 20
+      # LOG_LEVEL: INFO
+      # LIBRARY_LOG_LEVEL: CRITICAL
+      # Overcast is pinged if this variable is set at all, so leave it commented out to disable
+      # OVERCAST: "true"
+    volumes:
+      - bobcat-data:/bobcat
+
+volumes:
+  bobcat-data:

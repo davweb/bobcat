@@ -3,7 +3,7 @@ Bobcat allows you to ceate a podcast feed from your BBC Sounds subscriptions.
 
 Bobcat runs in a Docker container and uploads podcast files to an Amazon S3 Bucket.
 
-You can find it [here on Docker Hub](https://hub.docker.com/r/davweb/bobcat).
+The image is published to the GitHub Container Registry as [`ghcr.io/davweb/bobcat`](https://github.com/davweb/bobcat/pkgs/container/bobcat). A sample [`docker-compose.yml`](docker-compose.yml) is included.
 
 Here is how the feed looks in Apple Podcasts and Overcast.
 
@@ -53,7 +53,7 @@ The Environment Variables used by the Docker container are as follows:
 | `EPISODE_LIMIT` | The maximum number of episodes in the feed | | 20 |
 | `LOG_LEVEL` | The log level; one of `DEBUG`, `INFO`, `WARNING` or `CRITICAL` | | `INFO` |
 | `LIBRARY_LOG_LEVEL` | The log level for third party code; one of `DEBUG`, `INFO`, `WARNING` or `CRITICAL` | | `CRITICAL` |
-| `OVERCAST` | Set to any non-blank value to ping Overcast servers when podcast is updated | | |
+| `OVERCAST` | If set, Overcast servers are pinged when the podcast is updated | | |
 
 ## Volumes
 

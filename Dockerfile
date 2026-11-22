@@ -18,6 +18,9 @@ RUN uv sync --frozen --no-dev
 # Build the main image
 FROM base
 
+# Link the published image to its GitHub repository
+LABEL org.opencontainers.image.source=https://github.com/davweb/bobcat
+
 # Install python and runtime dependencies
 RUN apk add --no-cache python3 ffmpeg chromium chromium-chromedriver
 # Copy the built python dependencies from the builder image
